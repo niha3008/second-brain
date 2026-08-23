@@ -12,13 +12,13 @@ export default function Home() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
-  // Stores the REAL response returned by Gemini
   const [brainItem, setBrainItem] = useState<BrainItem | null>(null);
 
-  // Stores errors from the API
   const [error, setError] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
 
-  // Create and clean up the image preview URL.
+  // Create image preview URL
   useEffect(() => {
     if (!selectedFile) {
       setPreviewUrl(null);
@@ -47,6 +47,7 @@ export default function Home() {
 
     setError(null);
     setBrainItem(null);
+    setSaveSuccess(false);
     setSelectedFile(file);
   };
 
@@ -59,10 +60,10 @@ export default function Home() {
 
     setScreen("processing");
     setError(null);
+    setSaveSuccess(false);
 
     try {
       const formData = new FormData();
-
       formData.append("file", selectedFile);
 
       const response = await fetch("/api/ingest", {
@@ -76,9 +77,7 @@ export default function Home() {
         throw new Error(data.error || "Failed to process image.");
       }
 
-      // Gemini response should match our BrainItem type.
       setBrainItem(data as BrainItem);
-
       setScreen("result");
     } catch (error) {
       console.error("Frontend ingest error:", error);
@@ -94,6 +93,63 @@ export default function Home() {
   };
 
   // ─────────────────────────────────────────────
+  // SAVE BRAIN ITEM TO SUPABASE
+  // ─────────────────────────────────────────────
+
+  const handleSaveToBrain = async () => {
+    if (!brainItem || isSaving) return;
+
+    setIsSaving(true);
+    setError(null);
+    setSaveSuccess(false);
+
+    try {
+      const response = await fetch("/api/items", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(brainItem),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to save Brain item.");
+      }
+
+      console.log("Saved Brain item:", data);
+
+      setSaveSuccess(true);
+
+      // Give the user a moment to see the success state,
+      // then return to the upload screen.
+      setTimeout(() => {
+        setSelectedFile(null);
+        setPreviewUrl(null);
+        setBrainItem(null);
+        setError(null);
+        setSaveSuccess(false);
+        setScreen("upload");
+
+        if (fileInputRef.current) {
+          fileInputRef.current.value = "";
+        }
+      }, 1200);
+    } catch (error) {
+      console.error("Save error:", error);
+
+      setError(
+        error instanceof Error
+          ? error.message
+          : "Something went wrong while saving."
+      );
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // ─────────────────────────────────────────────
   // ADD ANOTHER
   // ─────────────────────────────────────────────
 
@@ -102,10 +158,26 @@ export default function Home() {
     setPreviewUrl(null);
     setBrainItem(null);
     setError(null);
+    setSaveSuccess(false);
+    setIsSaving(false);
     setScreen("upload");
 
-    // Reset file input so the user can select
-    // the same image again if they want.
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
+
+  // ─────────────────────────────────────────────
+  // REMOVE SELECTED FILE
+  // ─────────────────────────────────────────────
+
+  const handleRemoveFile = () => {
+    setSelectedFile(null);
+    setPreviewUrl(null);
+    setBrainItem(null);
+    setError(null);
+    setSaveSuccess(false);
+
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
@@ -167,7 +239,8 @@ export default function Home() {
             <button
               type="button"
               onClick={handleAddAnother}
-              className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm text-white/60 transition hover:bg-white/10 hover:text-white"
+              disabled={isSaving}
+              className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm text-white/60 transition hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
             >
               + Add another
             </button>
@@ -188,6 +261,20 @@ export default function Home() {
                 {brainItem.topic}
               </p>
             </div>
+
+            {/* Error */}
+            {error && (
+              <div className="mb-5 rounded-2xl border border-red-400/20 bg-red-400/10 px-5 py-4 text-sm text-red-200">
+                {error}
+              </div>
+            )}
+
+            {/* Success */}
+            {saveSuccess && (
+              <div className="mb-5 rounded-2xl border border-green-400/20 bg-green-400/10 px-5 py-4 text-sm text-green-200">
+                ✓ Saved to your Brain!
+              </div>
+            )}
 
             {/* Summary */}
             <section className="rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur-xl">
@@ -285,9 +372,15 @@ export default function Home() {
             {/* Save */}
             <button
               type="button"
-              className="mt-6 w-full rounded-2xl bg-white px-5 py-4 font-medium text-black transition hover:bg-white/90"
+              onClick={handleSaveToBrain}
+              disabled={isSaving || saveSuccess}
+              className="mt-6 w-full rounded-2xl bg-white px-5 py-4 font-medium text-black transition hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              Save to my Brain →
+              {saveSuccess
+                ? "✓ Saved to my Brain"
+                : isSaving
+                  ? "Saving to your Brain..."
+                  : "Save to my Brain →"}
             </button>
           </section>
         </div>
@@ -302,6 +395,7 @@ export default function Home() {
   return (
     <main className="min-h-screen bg-[#120c0d] text-white">
       <div className="mx-auto flex min-h-screen w-full max-w-5xl flex-col px-6 py-8 sm:px-10">
+        {/* Header */}
         <header className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/10 text-xl">
@@ -316,6 +410,7 @@ export default function Home() {
           </span>
         </header>
 
+        {/* Main */}
         <section className="flex flex-1 flex-col items-center justify-center py-16 text-center">
           <div className="mb-6 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm text-white/60">
             Save it once. Find it when it matters.
@@ -333,13 +428,14 @@ export default function Home() {
           </p>
 
           <div className="mt-12 w-full max-w-2xl">
-            {/* Error message */}
+            {/* Error */}
             {error && (
               <div className="mb-5 rounded-2xl border border-red-400/20 bg-red-400/10 px-5 py-4 text-left text-sm text-red-200">
                 {error}
               </div>
             )}
 
+            {/* Upload area */}
             {!selectedFile ? (
               <button
                 type="button"
@@ -364,9 +460,12 @@ export default function Home() {
               </button>
             ) : (
               <div className="rounded-3xl border border-white/15 bg-white/6 p-5 text-left backdrop-blur-xl">
+                {/* Selected file info */}
                 <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-medium">{selectedFile.name}</p>
+                  <div className="min-w-0">
+                    <p className="truncate font-medium">
+                      {selectedFile.name}
+                    </p>
 
                     <p className="mt-1 text-sm text-white/40">
                       Ready to add to your Brain
@@ -375,17 +474,8 @@ export default function Home() {
 
                   <button
                     type="button"
-                    onClick={() => {
-                      setSelectedFile(null);
-                      setPreviewUrl(null);
-                      setBrainItem(null);
-                      setError(null);
-
-                      if (fileInputRef.current) {
-                        fileInputRef.current.value = "";
-                      }
-                    }}
-                    className="rounded-full px-3 py-1.5 text-sm text-white/50 hover:bg-white/10 hover:text-white"
+                    onClick={handleRemoveFile}
+                    className="ml-4 shrink-0 rounded-full px-3 py-1.5 text-sm text-white/50 hover:bg-white/10 hover:text-white"
                   >
                     Remove
                   </button>
@@ -402,6 +492,7 @@ export default function Home() {
                   </div>
                 )}
 
+                {/* Analyze */}
                 <button
                   type="button"
                   onClick={handleAddToBrain}
@@ -412,6 +503,7 @@ export default function Home() {
               </div>
             )}
 
+            {/* Hidden file input */}
             <input
               ref={fileInputRef}
               type="file"
@@ -423,6 +515,7 @@ export default function Home() {
             />
           </div>
 
+          {/* Other input options */}
           <div className="mt-6 flex flex-col gap-3 sm:flex-row">
             <button
               type="button"
@@ -440,6 +533,7 @@ export default function Home() {
           </div>
         </section>
 
+        {/* Footer */}
         <footer className="pb-4 text-center text-xs text-white/25">
           Your saved content becomes part of your personal knowledge graph.
         </footer>
@@ -466,14 +560,13 @@ function ProcessingStep({ text }: { text: string }) {
 // ─────────────────────────────────────────────
 
 function Resource({ resource }: { resource: BrainResource }) {
-  const resourceType = resource.type.replace("_", " ");
+  const resourceType = resource.type.replaceAll("_", " ");
 
-  // If Gemini found a resource but couldn't identify
-  // a URL, don't create a broken/empty hyperlink.
+  // Resource exists but Gemini couldn't find a URL.
   if (!resource.url) {
     return (
       <div className="flex items-center justify-between rounded-2xl border border-white/10 bg-black/10 p-4">
-        <div>
+        <div className="min-w-0">
           <p className="text-xs capitalize text-white/35">
             {resourceType}
           </p>
@@ -483,7 +576,7 @@ function Resource({ resource }: { resource: BrainResource }) {
           </p>
         </div>
 
-        <span className="text-xs text-white/25">
+        <span className="ml-4 shrink-0 text-xs text-white/25">
           No link found
         </span>
       </div>
@@ -497,17 +590,17 @@ function Resource({ resource }: { resource: BrainResource }) {
       rel="noopener noreferrer"
       className="flex items-center justify-between rounded-2xl border border-white/10 bg-black/10 p-4 transition hover:border-white/20 hover:bg-white/5"
     >
-      <div>
+      <div className="min-w-0">
         <p className="text-xs capitalize text-white/35">
           {resourceType}
         </p>
 
-        <p className="mt-1 text-sm text-white/75">
+        <p className="mt-1 truncate text-sm text-white/75">
           {resource.title}
         </p>
       </div>
 
-      <span className="text-white/30">↗</span>
+      <span className="ml-4 shrink-0 text-white/30">↗</span>
     </a>
   );
 }
