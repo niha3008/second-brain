@@ -122,7 +122,6 @@ export default function DashboardPage() {
       <div className="flex min-h-screen">
         {/* Sidebar */}
         <aside className="hidden w-64 shrink-0 border-r border-white/10 bg-black/10 px-5 py-6 lg:flex lg:flex-col">
-          {/* Logo */}
           <Link href="/" className="flex items-center gap-3 px-2">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/10 text-xl">
               🧠
@@ -133,7 +132,6 @@ export default function DashboardPage() {
             </span>
           </Link>
 
-          {/* Navigation */}
           <nav className="mt-10 space-y-2">
             <NavItem
               icon="🏠"
@@ -164,7 +162,6 @@ export default function DashboardPage() {
             />
           </nav>
 
-          {/* Bottom */}
           <div className="mt-auto">
             <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
               <p className="text-sm font-medium">Your Brain</p>
@@ -184,12 +181,13 @@ export default function DashboardPage() {
           </div>
         </aside>
 
-        {/* Main content */}
+        {/* Main */}
         <div className="flex-1">
-          {/* Top bar */}
           <header className="flex items-center justify-between border-b border-white/10 px-6 py-5 sm:px-10">
             <div>
-              <p className="text-sm text-white/35">Your knowledge space</p>
+              <p className="text-sm text-white/35">
+                Your knowledge space
+              </p>
 
               <h1 className="mt-1 text-xl font-semibold">
                 Your Second Brain
@@ -354,7 +352,6 @@ function NavItem({
       }`}
     >
       <span>{icon}</span>
-
       <span>{label}</span>
     </button>
   );
@@ -386,8 +383,8 @@ function StatCard({
 
 function SavedItemCard({ item }: { item: SavedItem }) {
   return (
-    <button
-      type="button"
+    <Link
+      href={`/item/${item.id}`}
       className="group rounded-2xl border border-white/10 bg-white/5 p-5 text-left transition hover:border-white/20 hover:bg-white/[0.07]"
     >
       <div className="flex items-start justify-between gap-4">
@@ -417,7 +414,7 @@ function SavedItemCard({ item }: { item: SavedItem }) {
           →
         </span>
       </div>
-    </button>
+    </Link>
   );
 }
 
