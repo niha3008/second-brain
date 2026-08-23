@@ -1,8 +1,7 @@
 "use client";
 
-import { useRef, useState } from "react";
-import { mockBrainItem } from "@/lib/mock-data";
-import type { BrainResource } from "@/types/brain";
+import { useEffect, useRef, useState } from "react";
+import type { BrainItem, BrainResource } from "@/types/brain";
 
 type Screen = "upload" | "processing" | "result";
 
@@ -11,33 +10,105 @@ export default function Home() {
 
   const [screen, setScreen] = useState<Screen>("upload");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+
+  // Stores the REAL response returned by Gemini
+  const [brainItem, setBrainItem] = useState<BrainItem | null>(null);
+
+  // Stores errors from the API
+  const [error, setError] = useState<string | null>(null);
+
+  // Create and clean up the image preview URL.
+  useEffect(() => {
+    if (!selectedFile) {
+      setPreviewUrl(null);
+      return;
+    }
+
+    const url = URL.createObjectURL(selectedFile);
+    setPreviewUrl(url);
+
+    return () => {
+      URL.revokeObjectURL(url);
+    };
+  }, [selectedFile]);
+
+  // ─────────────────────────────────────────────
+  // FILE HANDLING
+  // ─────────────────────────────────────────────
 
   const handleFileChange = (file: File | null) => {
     if (!file) return;
 
     if (!file.type.startsWith("image/")) {
-      alert("Please upload an image.");
+      setError("Please upload an image.");
       return;
     }
 
+    setError(null);
+    setBrainItem(null);
     setSelectedFile(file);
   };
 
-  const handleAddToBrain = () => {
+  // ─────────────────────────────────────────────
+  // SEND IMAGE TO GEMINI
+  // ─────────────────────────────────────────────
+
+  const handleAddToBrain = async () => {
     if (!selectedFile) return;
 
     setScreen("processing");
+    setError(null);
 
-    // Temporary mock processing.
-    // Later this will call our Gemini/Supabase backend.
-    setTimeout(() => {
+    try {
+      const formData = new FormData();
+
+      formData.append("file", selectedFile);
+
+      const response = await fetch("/api/ingest", {
+        method: "POST",
+        body: formData,
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to process image.");
+      }
+
+      // Gemini response should match our BrainItem type.
+      setBrainItem(data as BrainItem);
+
       setScreen("result");
-    }, 3000);
+    } catch (error) {
+      console.error("Frontend ingest error:", error);
+
+      setError(
+        error instanceof Error
+          ? error.message
+          : "Something went wrong while processing your image."
+      );
+
+      setScreen("upload");
+    }
   };
+
+  // ─────────────────────────────────────────────
+  // ADD ANOTHER
+  // ─────────────────────────────────────────────
 
   const handleAddAnother = () => {
     setSelectedFile(null);
+    setPreviewUrl(null);
+    setBrainItem(null);
+    setError(null);
     setScreen("upload");
+
+    // Reset file input so the user can select
+    // the same image again if they want.
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
   };
 
   // ─────────────────────────────────────────────
@@ -80,7 +151,7 @@ export default function Home() {
   // RESULT SCREEN
   // ─────────────────────────────────────────────
 
-  if (screen === "result") {
+  if (screen === "result" && brainItem) {
     return (
       <main className="min-h-screen bg-[#120c0d] text-white">
         <div className="mx-auto min-h-screen w-full max-w-5xl px-6 py-8 sm:px-10">
@@ -103,17 +174,18 @@ export default function Home() {
           </header>
 
           <section className="mx-auto mt-16 max-w-3xl">
+            {/* Header */}
             <div className="mb-8">
               <p className="text-sm text-white/40">
                 AI analysis complete
               </p>
 
               <h1 className="mt-2 text-4xl font-semibold tracking-tight">
-                {mockBrainItem.title}
+                {brainItem.title}
               </h1>
 
               <p className="mt-3 text-white/50">
-                {mockBrainItem.topic}
+                {brainItem.topic}
               </p>
             </div>
 
@@ -124,26 +196,32 @@ export default function Home() {
               </p>
 
               <p className="mt-4 leading-7 text-white/75">
-                {mockBrainItem.summary}
+                {brainItem.summary}
               </p>
             </section>
 
-            {/* Concepts */}
+            {/* Key Concepts */}
             <section className="mt-5 rounded-3xl border border-white/10 bg-white/5 p-6">
               <p className="text-xs font-medium uppercase tracking-wider text-white/40">
                 Key concepts
               </p>
 
-              <div className="mt-4 flex flex-wrap gap-2">
-                {mockBrainItem.key_concepts.map((concept) => (
-                  <span
-                    key={concept}
-                    className="rounded-full border border-white/10 bg-white/5 px-3 py-2 text-sm text-white/70"
-                  >
-                    {concept}
-                  </span>
-                ))}
-              </div>
+              {brainItem.key_concepts.length > 0 ? (
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {brainItem.key_concepts.map((concept) => (
+                    <span
+                      key={concept}
+                      className="rounded-full border border-white/10 bg-white/5 px-3 py-2 text-sm text-white/70"
+                    >
+                      {concept}
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <p className="mt-4 text-sm text-white/40">
+                  No key concepts were identified.
+                </p>
+              )}
             </section>
 
             {/* Resources */}
@@ -160,17 +238,23 @@ export default function Home() {
                 </div>
 
                 <span className="rounded-full bg-white/10 px-3 py-1 text-xs text-white/50">
-                  {mockBrainItem.resources.length} found
+                  {brainItem.resources.length} found
                 </span>
               </div>
 
               <div className="mt-5 space-y-3">
-                {mockBrainItem.resources.map((resource) => (
-                  <Resource
-                    key={resource.title}
-                    resource={resource}
-                  />
-                ))}
+                {brainItem.resources.length > 0 ? (
+                  brainItem.resources.map((resource, index) => (
+                    <Resource
+                      key={`${resource.title}-${index}`}
+                      resource={resource}
+                    />
+                  ))
+                ) : (
+                  <p className="rounded-2xl border border-white/10 bg-black/10 p-4 text-sm text-white/40">
+                    No resources were found in this save.
+                  </p>
+                )}
               </div>
             </section>
 
@@ -180,16 +264,22 @@ export default function Home() {
                 Tags
               </p>
 
-              <div className="mt-4 flex flex-wrap gap-2">
-                {mockBrainItem.tags.map((tag) => (
-                  <span
-                    key={tag}
-                    className="rounded-full bg-white/10 px-3 py-2 text-sm text-white/60"
-                  >
-                    #{tag.replace(/\s+/g, "")}
-                  </span>
-                ))}
-              </div>
+              {brainItem.tags.length > 0 ? (
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {brainItem.tags.map((tag) => (
+                    <span
+                      key={tag}
+                      className="rounded-full bg-white/10 px-3 py-2 text-sm text-white/60"
+                    >
+                      #{tag.replace(/\s+/g, "")}
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <p className="mt-4 text-sm text-white/40">
+                  No tags were generated.
+                </p>
+              )}
             </section>
 
             {/* Save */}
@@ -243,6 +333,13 @@ export default function Home() {
           </p>
 
           <div className="mt-12 w-full max-w-2xl">
+            {/* Error message */}
+            {error && (
+              <div className="mb-5 rounded-2xl border border-red-400/20 bg-red-400/10 px-5 py-4 text-left text-sm text-red-200">
+                {error}
+              </div>
+            )}
+
             {!selectedFile ? (
               <button
                 type="button"
@@ -278,20 +375,32 @@ export default function Home() {
 
                   <button
                     type="button"
-                    onClick={() => setSelectedFile(null)}
+                    onClick={() => {
+                      setSelectedFile(null);
+                      setPreviewUrl(null);
+                      setBrainItem(null);
+                      setError(null);
+
+                      if (fileInputRef.current) {
+                        fileInputRef.current.value = "";
+                      }
+                    }}
                     className="rounded-full px-3 py-1.5 text-sm text-white/50 hover:bg-white/10 hover:text-white"
                   >
                     Remove
                   </button>
                 </div>
 
-                <div className="mt-5 overflow-hidden rounded-2xl border border-white/10 bg-black/20">
-                  <img
-                    src={URL.createObjectURL(selectedFile)}
-                    alt="Selected screenshot preview"
-                    className="max-h-[400px] w-full object-contain"
-                  />
-                </div>
+                {/* Image preview */}
+                {previewUrl && (
+                  <div className="mt-5 overflow-hidden rounded-2xl border border-white/10 bg-black/20">
+                    <img
+                      src={previewUrl}
+                      alt="Selected screenshot preview"
+                      className="max-h-[400px] w-full object-contain"
+                    />
+                  </div>
+                )}
 
                 <button
                   type="button"
@@ -340,7 +449,7 @@ export default function Home() {
 }
 
 // ─────────────────────────────────────────────
-// Small reusable components
+// PROCESSING STEP
 // ─────────────────────────────────────────────
 
 function ProcessingStep({ text }: { text: string }) {
@@ -352,7 +461,35 @@ function ProcessingStep({ text }: { text: string }) {
   );
 }
 
+// ─────────────────────────────────────────────
+// RESOURCE CARD
+// ─────────────────────────────────────────────
+
 function Resource({ resource }: { resource: BrainResource }) {
+  const resourceType = resource.type.replace("_", " ");
+
+  // If Gemini found a resource but couldn't identify
+  // a URL, don't create a broken/empty hyperlink.
+  if (!resource.url) {
+    return (
+      <div className="flex items-center justify-between rounded-2xl border border-white/10 bg-black/10 p-4">
+        <div>
+          <p className="text-xs capitalize text-white/35">
+            {resourceType}
+          </p>
+
+          <p className="mt-1 text-sm text-white/75">
+            {resource.title}
+          </p>
+        </div>
+
+        <span className="text-xs text-white/25">
+          No link found
+        </span>
+      </div>
+    );
+  }
+
   return (
     <a
       href={resource.url}
@@ -362,7 +499,7 @@ function Resource({ resource }: { resource: BrainResource }) {
     >
       <div>
         <p className="text-xs capitalize text-white/35">
-          {resource.type.replace("_", " ")}
+          {resourceType}
         </p>
 
         <p className="mt-1 text-sm text-white/75">
