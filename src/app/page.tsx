@@ -1,6 +1,8 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { mockBrainItem } from "@/lib/mock-data";
+import type { BrainResource } from "@/types/brain";
 
 type Screen = "upload" | "processing" | "result";
 
@@ -33,6 +35,11 @@ export default function Home() {
     }, 3000);
   };
 
+  const handleAddAnother = () => {
+    setSelectedFile(null);
+    setScreen("upload");
+  };
+
   // ─────────────────────────────────────────────
   // PROCESSING SCREEN
   // ─────────────────────────────────────────────
@@ -50,7 +57,8 @@ export default function Home() {
           </h1>
 
           <p className="mt-4 max-w-md text-white/50">
-            We're reading your content and figuring out what makes it useful.
+            We&apos;re reading your content and figuring out what makes it
+            useful.
           </p>
 
           <div className="mt-10 flex w-full max-w-sm flex-col gap-4 text-left">
@@ -87,10 +95,7 @@ export default function Home() {
 
             <button
               type="button"
-              onClick={() => {
-                setSelectedFile(null);
-                setScreen("upload");
-              }}
+              onClick={handleAddAnother}
               className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm text-white/60 transition hover:bg-white/10 hover:text-white"
             >
               + Add another
@@ -99,14 +104,16 @@ export default function Home() {
 
           <section className="mx-auto mt-16 max-w-3xl">
             <div className="mb-8">
-              <p className="text-sm text-white/40">AI analysis complete</p>
+              <p className="text-sm text-white/40">
+                AI analysis complete
+              </p>
 
               <h1 className="mt-2 text-4xl font-semibold tracking-tight">
-                Neural Networks
+                {mockBrainItem.title}
               </h1>
 
               <p className="mt-3 text-white/50">
-                Machine Learning · Artificial Intelligence
+                {mockBrainItem.topic}
               </p>
             </div>
 
@@ -117,10 +124,7 @@ export default function Home() {
               </p>
 
               <p className="mt-4 leading-7 text-white/75">
-                Neural networks are machine learning models inspired by the
-                structure of the human brain. They learn patterns from data by
-                passing information through connected layers of artificial
-                neurons.
+                {mockBrainItem.summary}
               </p>
             </section>
 
@@ -131,13 +135,7 @@ export default function Home() {
               </p>
 
               <div className="mt-4 flex flex-wrap gap-2">
-                {[
-                  "Neurons",
-                  "Activation Functions",
-                  "Backpropagation",
-                  "Gradient Descent",
-                  "Training",
-                ].map((concept) => (
+                {mockBrainItem.key_concepts.map((concept) => (
                   <span
                     key={concept}
                     className="rounded-full border border-white/10 bg-white/5 px-3 py-2 text-sm text-white/70"
@@ -162,25 +160,35 @@ export default function Home() {
                 </div>
 
                 <span className="rounded-full bg-white/10 px-3 py-1 text-xs text-white/50">
-                  3 found
+                  {mockBrainItem.resources.length} found
                 </span>
               </div>
 
               <div className="mt-5 space-y-3">
-                <Resource
-                  type="Research Paper"
-                  title="A Practical Introduction to Neural Networks"
-                />
+                {mockBrainItem.resources.map((resource) => (
+                  <Resource
+                    key={resource.title}
+                    resource={resource}
+                  />
+                ))}
+              </div>
+            </section>
 
-                <Resource
-                  type="Book"
-                  title="Deep Learning — Ian Goodfellow"
-                />
+            {/* Tags */}
+            <section className="mt-5 rounded-3xl border border-white/10 bg-white/5 p-6">
+              <p className="text-xs font-medium uppercase tracking-wider text-white/40">
+                Tags
+              </p>
 
-                <Resource
-                  type="Article"
-                  title="Neural Networks Explained"
-                />
+              <div className="mt-4 flex flex-wrap gap-2">
+                {mockBrainItem.tags.map((tag) => (
+                  <span
+                    key={tag}
+                    className="rounded-full bg-white/10 px-3 py-2 text-sm text-white/60"
+                  >
+                    #{tag.replace(/\s+/g, "")}
+                  </span>
+                ))}
               </div>
             </section>
 
@@ -344,21 +352,25 @@ function ProcessingStep({ text }: { text: string }) {
   );
 }
 
-function Resource({
-  type,
-  title,
-}: {
-  type: string;
-  title: string;
-}) {
+function Resource({ resource }: { resource: BrainResource }) {
   return (
-    <div className="flex items-center justify-between rounded-2xl border border-white/10 bg-black/10 p-4">
+    <a
+      href={resource.url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="flex items-center justify-between rounded-2xl border border-white/10 bg-black/10 p-4 transition hover:border-white/20 hover:bg-white/5"
+    >
       <div>
-        <p className="text-xs text-white/35">{type}</p>
-        <p className="mt-1 text-sm text-white/75">{title}</p>
+        <p className="text-xs capitalize text-white/35">
+          {resource.type.replace("_", " ")}
+        </p>
+
+        <p className="mt-1 text-sm text-white/75">
+          {resource.title}
+        </p>
       </div>
 
       <span className="text-white/30">↗</span>
-    </div>
+    </a>
   );
 }
