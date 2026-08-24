@@ -1,7 +1,5 @@
-"use client";
-
 import Link from "next/link";
-import { useState } from "react";
+import Sidebar from "@/components/layout/sidebar";
 
 type SavedItem = {
   id: string;
@@ -12,6 +10,7 @@ type SavedItem = {
 };
 
 type Topic = {
+  id: string;
   name: string;
   count: number;
   description: string;
@@ -70,21 +69,25 @@ const recentItems: SavedItem[] = [
 
 const topics: Topic[] = [
   {
+    id: "ai-machine-learning",
     name: "AI & Machine Learning",
     count: 8,
     description: "Models, neural networks, LLMs and AI research",
   },
   {
+    id: "web-development",
     name: "Web Development",
     count: 12,
     description: "React, Next.js, APIs and frontend development",
   },
   {
+    id: "computer-science",
     name: "Computer Science",
     count: 9,
     description: "Algorithms, systems, databases and architecture",
   },
   {
+    id: "finance",
     name: "Finance",
     count: 5,
     description: "Fintech, markets, investing and financial systems",
@@ -115,74 +118,13 @@ const resourceCategories: ResourceCategory[] = [
 ];
 
 export default function DashboardPage() {
-  const [activeNav, setActiveNav] = useState("Brain");
-
   return (
     <main className="min-h-screen bg-[#120c0d] text-white">
       <div className="flex min-h-screen">
-        {/* Sidebar */}
-        <aside className="hidden w-64 shrink-0 border-r border-white/10 bg-black/10 px-5 py-6 lg:flex lg:flex-col">
-          <Link href="/" className="flex items-center gap-3 px-2">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/10 text-xl">
-              🧠
-            </div>
+        <Sidebar active="brain" />
 
-            <span className="text-lg font-semibold tracking-tight">
-              Second Brain
-            </span>
-          </Link>
-
-          <nav className="mt-10 space-y-2">
-            <NavItem
-              icon="🏠"
-              label="Brain"
-              active={activeNav === "Brain"}
-              onClick={() => setActiveNav("Brain")}
-            />
-
-            <NavItem
-              icon="📚"
-              label="Topics"
-              active={activeNav === "Topics"}
-              onClick={() => setActiveNav("Topics")}
-            />
-
-            <NavItem
-              icon="🔖"
-              label="Saves"
-              active={activeNav === "Saves"}
-              onClick={() => setActiveNav("Saves")}
-            />
-
-            <NavItem
-              icon="📖"
-              label="Resources"
-              active={activeNav === "Resources"}
-              onClick={() => setActiveNav("Resources")}
-            />
-          </nav>
-
-          <div className="mt-auto">
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-              <p className="text-sm font-medium">Your Brain</p>
-
-              <p className="mt-1 text-xs leading-5 text-white/40">
-                34 saves have been turned into organized knowledge.
-              </p>
-
-              <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-white/10">
-                <div className="h-full w-[68%] rounded-full bg-white/60" />
-              </div>
-
-              <p className="mt-2 text-xs text-white/30">
-                68% organized
-              </p>
-            </div>
-          </div>
-        </aside>
-
-        {/* Main */}
         <div className="flex-1">
+          {/* Header */}
           <header className="flex items-center justify-between border-b border-white/10 px-6 py-5 sm:px-10">
             <div>
               <p className="text-sm text-white/35">
@@ -224,7 +166,7 @@ export default function DashboardPage() {
               <StatCard
                 value="34"
                 label="Saved items"
-                description="Things you've captured"
+                description="Things you&apos;ve captured"
               />
 
               <StatCard
@@ -253,12 +195,12 @@ export default function DashboardPage() {
                   </h2>
                 </div>
 
-                <button
-                  type="button"
+                <Link
+                  href="/dashboard"
                   className="text-sm text-white/40 transition hover:text-white"
                 >
                   View all →
-                </button>
+                </Link>
               </div>
 
               <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
@@ -273,20 +215,29 @@ export default function DashboardPage() {
 
             {/* Topics */}
             <section className="mt-14">
-              <div>
-                <p className="text-xs font-medium uppercase tracking-wider text-white/35">
-                  Knowledge map
-                </p>
+              <div className="flex items-end justify-between">
+                <div>
+                  <p className="text-xs font-medium uppercase tracking-wider text-white/35">
+                    Knowledge map
+                  </p>
 
-                <h2 className="mt-2 text-xl font-semibold">
-                  Your topics
-                </h2>
+                  <h2 className="mt-2 text-xl font-semibold">
+                    Your topics
+                  </h2>
+                </div>
+
+                <Link
+                  href="/topics"
+                  className="text-sm text-white/40 transition hover:text-white"
+                >
+                  View all →
+                </Link>
               </div>
 
               <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                 {topics.map((topic) => (
                   <TopicCard
-                    key={topic.name}
+                    key={topic.id}
                     topic={topic}
                   />
                 ))}
@@ -295,19 +246,28 @@ export default function DashboardPage() {
 
             {/* Resources */}
             <section className="mt-14 pb-12">
-              <div>
-                <p className="text-xs font-medium uppercase tracking-wider text-white/35">
-                  Your library
-                </p>
+              <div className="flex items-end justify-between">
+                <div>
+                  <p className="text-xs font-medium uppercase tracking-wider text-white/35">
+                    Your library
+                  </p>
 
-                <h2 className="mt-2 text-xl font-semibold">
-                  Resources
-                </h2>
+                  <h2 className="mt-2 text-xl font-semibold">
+                    Resources
+                  </h2>
 
-                <p className="mt-2 text-sm text-white/40">
-                  Useful resources discovered across everything you&apos;ve
-                  saved.
-                </p>
+                  <p className="mt-2 text-sm text-white/40">
+                    Useful resources discovered across everything you&apos;ve
+                    saved.
+                  </p>
+                </div>
+
+                <Link
+                  href="/resources"
+                  className="text-sm text-white/40 transition hover:text-white"
+                >
+                  View all →
+                </Link>
               </div>
 
               <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -327,35 +287,8 @@ export default function DashboardPage() {
 }
 
 /* ─────────────────────────────────────────────
-   Components
+   Stat Card
 ───────────────────────────────────────────── */
-
-function NavItem({
-  icon,
-  label,
-  active,
-  onClick,
-}: {
-  icon: string;
-  label: string;
-  active: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition ${
-        active
-          ? "bg-white/10 text-white"
-          : "text-white/40 hover:bg-white/5 hover:text-white"
-      }`}
-    >
-      <span>{icon}</span>
-      <span>{label}</span>
-    </button>
-  );
-}
 
 function StatCard({
   value,
@@ -368,7 +301,9 @@ function StatCard({
 }) {
   return (
     <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
-      <p className="text-3xl font-semibold">{value}</p>
+      <p className="text-3xl font-semibold">
+        {value}
+      </p>
 
       <p className="mt-2 text-sm font-medium text-white/75">
         {label}
@@ -381,7 +316,15 @@ function StatCard({
   );
 }
 
-function SavedItemCard({ item }: { item: SavedItem }) {
+/* ─────────────────────────────────────────────
+   Saved Item Card
+───────────────────────────────────────────── */
+
+function SavedItemCard({
+  item,
+}: {
+  item: SavedItem;
+}) {
   return (
     <Link
       href={`/item/${item.id}`}
@@ -397,7 +340,7 @@ function SavedItemCard({ item }: { item: SavedItem }) {
         </span>
       </div>
 
-      <h3 className="mt-5 font-medium text-white/90 group-hover:text-white">
+      <h3 className="mt-5 font-medium text-white/90 transition group-hover:text-white">
         {item.title}
       </h3>
 
@@ -418,11 +361,19 @@ function SavedItemCard({ item }: { item: SavedItem }) {
   );
 }
 
-function TopicCard({ topic }: { topic: Topic }) {
+/* ─────────────────────────────────────────────
+   Topic Card
+───────────────────────────────────────────── */
+
+function TopicCard({
+  topic,
+}: {
+  topic: Topic;
+}) {
   return (
-    <button
-      type="button"
-      className="rounded-2xl border border-white/10 bg-white/5 p-5 text-left transition hover:border-white/20 hover:bg-white/[0.07]"
+    <Link
+      href={`/topics/${topic.id}`}
+      className="group rounded-2xl border border-white/10 bg-white/5 p-5 text-left transition hover:border-white/20 hover:bg-white/[0.07]"
     >
       <div className="flex items-center justify-between">
         <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/10 text-sm">
@@ -434,16 +385,20 @@ function TopicCard({ topic }: { topic: Topic }) {
         </span>
       </div>
 
-      <h3 className="mt-5 text-sm font-medium text-white/80">
+      <h3 className="mt-5 text-sm font-medium text-white/80 transition group-hover:text-white">
         {topic.name}
       </h3>
 
       <p className="mt-2 text-xs leading-5 text-white/35">
         {topic.description}
       </p>
-    </button>
+    </Link>
   );
 }
+
+/* ─────────────────────────────────────────────
+   Resource Card
+───────────────────────────────────────────── */
 
 function ResourceCard({
   resource,
@@ -451,16 +406,16 @@ function ResourceCard({
   resource: ResourceCategory;
 }) {
   return (
-    <button
-      type="button"
-      className="flex items-center gap-4 rounded-2xl border border-white/10 bg-white/5 p-5 text-left transition hover:border-white/20 hover:bg-white/[0.07]"
+    <Link
+      href="/resources"
+      className="group flex items-center gap-4 rounded-2xl border border-white/10 bg-white/5 p-5 text-left transition hover:border-white/20 hover:bg-white/[0.07]"
     >
       <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white/10 text-lg">
         {resource.icon}
       </div>
 
       <div>
-        <p className="text-sm font-medium text-white/75">
+        <p className="text-sm font-medium text-white/75 transition group-hover:text-white">
           {resource.label}
         </p>
 
@@ -468,20 +423,28 @@ function ResourceCard({
           {resource.count} resources
         </p>
       </div>
-    </button>
+    </Link>
   );
 }
+
+/* ─────────────────────────────────────────────
+   Type Icon
+───────────────────────────────────────────── */
 
 function getTypeIcon(type: SavedItem["type"]) {
   switch (type) {
     case "Screenshot":
       return "📸";
+
     case "Article":
       return "📄";
+
     case "Video":
       return "🎥";
+
     case "Text":
       return "📝";
+
     default:
       return "📌";
   }
