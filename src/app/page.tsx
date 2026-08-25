@@ -1,590 +1,544 @@
-"use client";
+import Link from "next/link";
+import { createClient } from "@/lib/supabase/server";
 
-import Image from "next/image";
-import { useRef, useState } from "react";
-import type { BrainItem, BrainResource } from "@/types/brain";
+type BrainResource = {
+  type: string;
+  title: string;
+  url: string;
+};
 
-type Screen = "upload" | "processing" | "result";
+type BrainItem = {
+  id: string;
+  title: string;
+  topic: string;
+  summary: string;
+  key_concepts: string[];
+  resources: BrainResource[];
+  tags: string[];
+  created_at: string;
+};
 
-export default function Home() {
-  const fileInputRef = useRef<HTMLInputElement>(null);
+async function getBrainItems(): Promise<BrainItem[]> {
+  const supabase = await createClient();
+  
+  const { data, error } = await supabase
+    .from("brain_items")
+    .select("*")
+    .order("created_at", { ascending: false });
 
-  const [screen, setScreen] = useState<Screen>("upload");
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [brainItem, setBrainItem] = useState<BrainItem | null>(null);
-
-  const [error, setError] = useState<string | null>(null);
-  const [isSaving, setIsSaving] = useState(false);
-  const [saveSuccess, setSaveSuccess] = useState(false);
-
-  // ─────────────────────────────────────────────
-  // FILE HANDLING
-  // ─────────────────────────────────────────────
-
-  const handleFileChange = (file: File | null) => {
-    if (!file) return;
-
-    if (!file.type.startsWith("image/")) {
-      setError("Please upload an image.");
-      return;
-    }
-
-    setError(null);
-    setBrainItem(null);
-    setSaveSuccess(false);
-    setSelectedFile(file);
-
-    const reader = new FileReader();
-
-    reader.onload = () => {
-      if (typeof reader.result === "string") {
-        setPreviewUrl(reader.result);
-      }
-    };
-
-    reader.onerror = () => {
-      setError("Could not preview the selected image.");
-      setPreviewUrl(null);
-    };
-
-    reader.readAsDataURL(file);
-  };
-
-  // ─────────────────────────────────────────────
-  // SEND IMAGE TO GEMINI
-  // ─────────────────────────────────────────────
-
-  const handleAddToBrain = async () => {
-    if (!selectedFile) return;
-
-    setScreen("processing");
-    setError(null);
-    setSaveSuccess(false);
-
-    try {
-      const formData = new FormData();
-      formData.append("file", selectedFile);
-
-      const response = await fetch("/api/ingest", {
-        method: "POST",
-        body: formData,
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || "Failed to process image.");
-      }
-
-      setBrainItem(data as BrainItem);
-      setScreen("result");
-    } catch (error) {
-      console.error("Frontend ingest error:", error);
-
-      setError(
-        error instanceof Error
-          ? error.message
-          : "Something went wrong while processing your image."
-      );
-
-      setScreen("upload");
-    }
-  };
-
-  // ─────────────────────────────────────────────
-  // SAVE BRAIN ITEM TO SUPABASE
-  // ─────────────────────────────────────────────
-
-  const handleSaveToBrain = async () => {
-    if (!brainItem || isSaving) return;
-
-    setIsSaving(true);
-    setError(null);
-    setSaveSuccess(false);
-
-    try {
-      const response = await fetch("/api/items", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(brainItem),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || "Failed to save Brain item.");
-      }
-
-      console.log("Saved Brain item:", data);
-
-      setSaveSuccess(true);
-
-      setTimeout(() => {
-        setSelectedFile(null);
-        setPreviewUrl(null);
-        setBrainItem(null);
-        setError(null);
-        setSaveSuccess(false);
-        setScreen("upload");
-
-        if (fileInputRef.current) {
-          fileInputRef.current.value = "";
-        }
-      }, 1200);
-    } catch (error) {
-      console.error("Save error:", error);
-
-      setError(
-        error instanceof Error
-          ? error.message
-          : "Something went wrong while saving."
-      );
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  // ─────────────────────────────────────────────
-  // ADD ANOTHER
-  // ─────────────────────────────────────────────
-
-  const handleAddAnother = () => {
-    setSelectedFile(null);
-    setPreviewUrl(null);
-    setBrainItem(null);
-    setError(null);
-    setSaveSuccess(false);
-    setIsSaving(false);
-    setScreen("upload");
-
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
-    }
-  };
-
-  // ─────────────────────────────────────────────
-  // REMOVE SELECTED FILE
-  // ─────────────────────────────────────────────
-
-  const handleRemoveFile = () => {
-    setSelectedFile(null);
-    setPreviewUrl(null);
-    setBrainItem(null);
-    setError(null);
-    setSaveSuccess(false);
-
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
-    }
-  };
-
-  // ─────────────────────────────────────────────
-  // PROCESSING SCREEN
-  // ─────────────────────────────────────────────
-
-  if (screen === "processing") {
-    return (
-      <main className="min-h-screen bg-[#120c0d] text-white">
-        <div className="mx-auto flex min-h-screen max-w-5xl flex-col items-center justify-center px-6 text-center">
-          <div className="flex h-20 w-20 animate-pulse items-center justify-center rounded-3xl bg-white/10 text-3xl">
-            🧠
-          </div>
-
-          <h1 className="mt-8 text-3xl font-semibold tracking-tight sm:text-4xl">
-            Understanding your save...
-          </h1>
-
-          <p className="mt-4 max-w-md text-white/50">
-            We&apos;re reading your content and figuring out what makes it
-            useful.
-          </p>
-
-          <div className="mt-10 flex w-full max-w-sm flex-col gap-4 text-left">
-            <ProcessingStep text="Reading the content" />
-            <ProcessingStep text="Finding the main topic" />
-            <ProcessingStep text="Extracting useful resources" />
-            <ProcessingStep text="Connecting the dots" />
-          </div>
-
-          <div className="mt-10 h-1.5 w-64 overflow-hidden rounded-full bg-white/10">
-            <div className="h-full w-1/2 animate-pulse rounded-full bg-white/70" />
-          </div>
-        </div>
-      </main>
-    );
+  if (error) {
+    console.error("Supabase dashboard fetch error:", error);
+    throw new Error(error.message);
   }
 
-  // ─────────────────────────────────────────────
-  // RESULT SCREEN
-  // ─────────────────────────────────────────────
+  return (data ?? []) as BrainItem[];
+}
 
-  if (screen === "result" && brainItem) {
-    return (
-      <main className="min-h-screen bg-[#120c0d] text-white">
-        <div className="mx-auto min-h-screen w-full max-w-5xl px-6 py-8 sm:px-10">
-          <header className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/10 text-xl">
-                🧠
-              </div>
+export default async function DashboardPage() {
+  let items: BrainItem[] = [];
+  let error = false;
 
-              <span className="text-lg font-semibold">Second Brain</span>
-            </div>
-
-            <button
-              type="button"
-              onClick={handleAddAnother}
-              disabled={isSaving}
-              className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm text-white/60 transition hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              + Add another
-            </button>
-          </header>
-
-          <section className="mx-auto mt-16 max-w-3xl">
-            <div className="mb-8">
-              <p className="text-sm text-white/40">
-                AI analysis complete
-              </p>
-
-              <h1 className="mt-2 text-4xl font-semibold tracking-tight">
-                {brainItem.title}
-              </h1>
-
-              <p className="mt-3 text-white/50">
-                {brainItem.topic}
-              </p>
-            </div>
-
-            {error && (
-              <div className="mb-5 rounded-2xl border border-red-400/20 bg-red-400/10 px-5 py-4 text-sm text-red-200">
-                {error}
-              </div>
-            )}
-
-            {saveSuccess && (
-              <div className="mb-5 rounded-2xl border border-green-400/20 bg-green-400/10 px-5 py-4 text-sm text-green-200">
-                ✓ Saved to your Brain!
-              </div>
-            )}
-
-            <section className="rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur-xl">
-              <p className="text-xs font-medium uppercase tracking-wider text-white/40">
-                Summary
-              </p>
-
-              <p className="mt-4 leading-7 text-white/75">
-                {brainItem.summary}
-              </p>
-            </section>
-
-            <section className="mt-5 rounded-3xl border border-white/10 bg-white/5 p-6">
-              <p className="text-xs font-medium uppercase tracking-wider text-white/40">
-                Key concepts
-              </p>
-
-              {brainItem.key_concepts.length > 0 ? (
-                <div className="mt-4 flex flex-wrap gap-2">
-                  {brainItem.key_concepts.map((concept) => (
-                    <span
-                      key={concept}
-                      className="rounded-full border border-white/10 bg-white/5 px-3 py-2 text-sm text-white/70"
-                    >
-                      {concept}
-                    </span>
-                  ))}
-                </div>
-              ) : (
-                <p className="mt-4 text-sm text-white/40">
-                  No key concepts were identified.
-                </p>
-              )}
-            </section>
-
-            <section className="mt-5 rounded-3xl border border-white/10 bg-white/5 p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-medium uppercase tracking-wider text-white/40">
-                    Resources found
-                  </p>
-
-                  <p className="mt-1 text-sm text-white/40">
-                    Resources related to this save
-                  </p>
-                </div>
-
-                <span className="rounded-full bg-white/10 px-3 py-1 text-xs text-white/50">
-                  {brainItem.resources.length} found
-                </span>
-              </div>
-
-              <div className="mt-5 space-y-3">
-                {brainItem.resources.length > 0 ? (
-                  brainItem.resources.map((resource, index) => (
-                    <Resource
-                      key={`${resource.title}-${index}`}
-                      resource={resource}
-                    />
-                  ))
-                ) : (
-                  <p className="rounded-2xl border border-white/10 bg-black/10 p-4 text-sm text-white/40">
-                    No resources were found in this save.
-                  </p>
-                )}
-              </div>
-            </section>
-
-            <section className="mt-5 rounded-3xl border border-white/10 bg-white/5 p-6">
-              <p className="text-xs font-medium uppercase tracking-wider text-white/40">
-                Tags
-              </p>
-
-              {brainItem.tags.length > 0 ? (
-                <div className="mt-4 flex flex-wrap gap-2">
-                  {brainItem.tags.map((tag) => (
-                    <span
-                      key={tag}
-                      className="rounded-full bg-white/10 px-3 py-2 text-sm text-white/60"
-                    >
-                      #{tag.replace(/\s+/g, "")}
-                    </span>
-                  ))}
-                </div>
-              ) : (
-                <p className="mt-4 text-sm text-white/40">
-                  No tags were generated.
-                </p>
-              )}
-            </section>
-
-            <button
-              type="button"
-              onClick={handleSaveToBrain}
-              disabled={isSaving || saveSuccess}
-              className="mt-6 w-full rounded-2xl bg-white px-5 py-4 font-medium text-black transition hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {saveSuccess
-                ? "✓ Saved to my Brain"
-                : isSaving
-                  ? "Saving to your Brain..."
-                  : "Save to my Brain →"}
-            </button>
-          </section>
-        </div>
-      </main>
-    );
+  try {
+    items = await getBrainItems();
+  } catch (err) {
+    console.error("Dashboard fetch error:", err);
+    error = true;
   }
 
-  // ─────────────────────────────────────────────
-  // UPLOAD SCREEN
-  // ─────────────────────────────────────────────
+  const topics = buildTopics(items);
+  const resources = buildResources(items);
+
+  const totalResources = items.reduce(
+    (total, item) => total + item.resources.length,
+    0
+  );
 
   return (
     <main className="min-h-screen bg-[#120c0d] text-white">
-      <div className="mx-auto flex min-h-screen w-full max-w-5xl flex-col px-6 py-8 sm:px-10">
-        <header className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
+      <div className="flex min-h-screen">
+        {/* Sidebar */}
+        <aside className="hidden w-64 shrink-0 border-r border-white/10 bg-black/10 px-5 py-6 lg:flex lg:flex-col">
+          <Link href="/add" className="flex items-center gap-3 px-2">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/10 text-xl">
               🧠
             </div>
 
-            <span className="text-lg font-semibold">Second Brain</span>
+            <span className="text-lg font-semibold tracking-tight">
+              Second Brain
+            </span>
+          </Link>
+
+          <nav className="mt-10 space-y-2">
+            <NavItem href="/dashboard" icon="🧠" label="Brain" active />
+
+            <NavItem href="/topics" icon="📚" label="Topics" />
+
+            <NavItem href="/dashboard" icon="🔖" label="Saves" />
+
+            <NavItem href="/resources" icon="📖" label="Resources" />
+          </nav>
+
+          <div className="mt-auto">
+            <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+              <p className="text-sm font-medium">Your Brain</p>
+
+              <p className="mt-1 text-xs leading-5 text-white/40">
+                {items.length}{" "}
+                {items.length === 1 ? "save has" : "saves have"} been turned
+                into organized knowledge.
+              </p>
+
+              <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-white/10">
+                <div className="h-full w-full rounded-full bg-white/60" />
+              </div>
+
+              <p className="mt-2 text-xs text-white/30">
+                {items.length > 0 ? "Organized" : "No saves yet"}
+              </p>
+            </div>
           </div>
+        </aside>
 
-          <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-white/60">
-            Your knowledge, organized.
-          </span>
-        </header>
+        {/* Main */}
+        <div className="flex-1">
+          <header className="flex items-center justify-between border-b border-white/10 px-6 py-5 sm:px-10">
+            <div>
+              <p className="text-sm text-white/35">
+                Your knowledge space
+              </p>
 
-        <section className="flex flex-1 flex-col items-center justify-center py-16 text-center">
-          <div className="mb-6 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm text-white/60">
-            Save it once. Find it when it matters.
-          </div>
+              <h1 className="mt-1 text-xl font-semibold">
+                Your Second Brain
+              </h1>
+            </div>
 
-          <h1 className="max-w-3xl text-4xl font-semibold tracking-tight sm:text-6xl">
-            Turn the things you save into{" "}
-            <span className="text-white/50">knowledge.</span>
-          </h1>
+            <Link
+              href="/add"
+              className="rounded-full bg-white px-5 py-2.5 text-sm font-medium text-black transition hover:bg-white/90"
+            >
+              + Add to Brain
+            </Link>
+          </header>
 
-          <p className="mt-6 max-w-2xl text-base leading-7 text-white/55 sm:text-lg">
-            Drop a screenshot, link, or piece of text. Second Brain will
-            understand it, connect it to what you already know, and help you
-            learn from it later.
-          </p>
+          <div className="mx-auto max-w-7xl px-6 py-10 sm:px-10">
+            {/* Welcome */}
+            <section>
+              <p className="text-sm text-white/40">
+                {items.length}{" "}
+                {items.length === 1 ? "thing saved" : "things saved"}
+              </p>
 
-          <div className="mt-12 w-full max-w-2xl">
+              <h2 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">
+                Your knowledge, organized.
+              </h2>
+
+              <p className="mt-3 max-w-2xl text-white/45">
+                Everything you&apos;ve saved, transformed into topics,
+                concepts and resources you can actually use.
+              </p>
+            </section>
+
+            {/* Error */}
             {error && (
-              <div className="mb-5 rounded-2xl border border-red-400/20 bg-red-400/10 px-5 py-4 text-left text-sm text-red-200">
-                {error}
+              <div className="mt-8 rounded-2xl border border-red-400/20 bg-red-400/10 p-5 text-sm text-red-200">
+                We couldn&apos;t load your Brain items. Please refresh and try
+                again.
               </div>
             )}
 
-            {!selectedFile ? (
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                className="group flex w-full flex-col items-center justify-center rounded-3xl border border-white/15 bg-white/6 px-6 py-16 backdrop-blur-xl transition-all hover:border-white/25 hover:bg-white/10"
-              >
-                <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-white/10 text-2xl transition-transform group-hover:scale-105">
-                  ↑
+            {/* Stats */}
+            <section className="mt-10 grid gap-4 sm:grid-cols-3">
+              <StatCard
+                value={String(items.length)}
+                label="Saved items"
+                description="Things you've captured"
+              />
+
+              <StatCard
+                value={String(topics.length)}
+                label="Topics"
+                description="Areas of knowledge"
+              />
+
+              <StatCard
+                value={String(totalResources)}
+                label="Resources"
+                description="Papers, books & links"
+              />
+            </section>
+
+            {/* Recently added */}
+            <section className="mt-12">
+              <div className="flex items-end justify-between">
+                <div>
+                  <p className="text-xs font-medium uppercase tracking-wider text-white/35">
+                    Your latest knowledge
+                  </p>
+
+                  <h2 className="mt-2 text-xl font-semibold">
+                    Recently added
+                  </h2>
                 </div>
 
-                <h2 className="text-lg font-medium">
-                  Drop a screenshot here
-                </h2>
-
-                <p className="mt-2 text-sm text-white/45">
-                  or click to browse from your device
-                </p>
-
-                <p className="mt-5 text-xs text-white/30">
-                  PNG, JPG or WEBP
-                </p>
-              </button>
-            ) : (
-              <div className="rounded-3xl border border-white/15 bg-white/6 p-5 text-left backdrop-blur-xl">
-                <div className="flex items-center justify-between">
-                  <div className="min-w-0">
-                    <p className="truncate font-medium">
-                      {selectedFile.name}
-                    </p>
-
-                    <p className="mt-1 text-sm text-white/40">
-                      Ready to add to your Brain
-                    </p>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={handleRemoveFile}
-                    className="ml-4 shrink-0 rounded-full px-3 py-1.5 text-sm text-white/50 hover:bg-white/10 hover:text-white"
-                  >
-                    Remove
-                  </button>
-                </div>
-
-                {previewUrl && (
-                  <div className="mt-5 overflow-hidden rounded-2xl border border-white/10 bg-black/20">
-                    <Image
-                      src={previewUrl}
-                      alt="Selected screenshot preview"
-                      width={800}
-                      height={400}
-                      unoptimized
-                      className="max-h-[400px] w-full object-contain"
-                    />
-                  </div>
-                )}
-
-                <button
-                  type="button"
-                  onClick={handleAddToBrain}
-                  className="mt-5 w-full rounded-2xl bg-white px-5 py-3 font-medium text-black transition hover:bg-white/90"
+                <Link
+                  href="/dashboard"
+                  className="text-sm text-white/40 transition hover:text-white"
                 >
-                  Add to Brain →
-                </button>
+                  View all →
+                </Link>
               </div>
-            )}
 
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/png,image/jpeg,image/webp"
-              className="hidden"
-              onChange={(event) =>
-                handleFileChange(event.target.files?.[0] ?? null)
-              }
-            />
+              {items.length > 0 ? (
+                <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                  {items.slice(0, 6).map((item) => (
+                    <SavedItemCard key={item.id} item={item} />
+                  ))}
+                </div>
+              ) : (
+                <EmptyState
+                  title="Your Brain is empty"
+                  description="Upload your first screenshot to start building your knowledge."
+                />
+              )}
+            </section>
+
+            {/* Topics */}
+            <section className="mt-14">
+              <div className="flex items-end justify-between">
+                <div>
+                  <p className="text-xs font-medium uppercase tracking-wider text-white/35">
+                    Knowledge map
+                  </p>
+
+                  <h2 className="mt-2 text-xl font-semibold">
+                    Your topics
+                  </h2>
+                </div>
+
+                <Link
+                  href="/topics"
+                  className="text-sm text-white/40 transition hover:text-white"
+                >
+                  Explore →
+                </Link>
+              </div>
+
+              {topics.length > 0 ? (
+                <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                  {topics.slice(0, 4).map((topic) => (
+                    <TopicCard key={topic.name} topic={topic} />
+                  ))}
+                </div>
+              ) : (
+                <EmptyState
+                  title="No topics yet"
+                  description="Topics will appear as you save more knowledge."
+                />
+              )}
+            </section>
+
+            {/* Resources */}
+            <section className="mt-14 pb-12">
+              <div className="flex items-end justify-between">
+                <div>
+                  <p className="text-xs font-medium uppercase tracking-wider text-white/35">
+                    Your library
+                  </p>
+
+                  <h2 className="mt-2 text-xl font-semibold">
+                    Resources
+                  </h2>
+
+                  <p className="mt-2 text-sm text-white/40">
+                    Useful resources discovered across everything you&apos;ve
+                    saved.
+                  </p>
+                </div>
+
+                <Link
+                  href="/resources"
+                  className="text-sm text-white/40 transition hover:text-white"
+                >
+                  View library →
+                </Link>
+              </div>
+
+              {resources.length > 0 ? (
+                <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                  {resources.slice(0, 4).map((resource) => (
+                    <ResourceCard
+                      key={resource.label}
+                      resource={resource}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <EmptyState
+                  title="No resources yet"
+                  description="Resources will appear here when they are found in your saved content."
+                />
+              )}
+            </section>
           </div>
-
-          <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-            <button
-              type="button"
-              className="rounded-full border border-white/10 bg-white/5 px-5 py-2.5 text-sm text-white/60 transition hover:bg-white/10 hover:text-white"
-            >
-              🔗 Paste a URL
-            </button>
-
-            <button
-              type="button"
-              className="rounded-full border border-white/10 bg-white/5 px-5 py-2.5 text-sm text-white/60 transition hover:bg-white/10 hover:text-white"
-            >
-              📝 Add text
-            </button>
-          </div>
-        </section>
-
-        <footer className="pb-4 text-center text-xs text-white/25">
-          Your saved content becomes part of your personal knowledge graph.
-        </footer>
+        </div>
       </div>
     </main>
   );
 }
 
-// ─────────────────────────────────────────────
-// PROCESSING STEP
-// ─────────────────────────────────────────────
+/* ─────────────────────────────────────────────
+   Types
+───────────────────────────────────────────── */
 
-function ProcessingStep({ text }: { text: string }) {
+type Topic = {
+  name: string;
+  count: number;
+  description: string;
+};
+
+type ResourceCategory = {
+  label: string;
+  count: number;
+  icon: string;
+};
+
+/* ─────────────────────────────────────────────
+   Data helpers
+───────────────────────────────────────────── */
+
+function buildTopics(items: BrainItem[]): Topic[] {
+  const topicMap = new Map<string, number>();
+
+  for (const item of items) {
+    const topic = item.topic.trim();
+
+    if (!topic) continue;
+
+    topicMap.set(topic, (topicMap.get(topic) ?? 0) + 1);
+  }
+
+  return Array.from(topicMap.entries())
+    .map(([name, count]) => ({
+      name,
+      count,
+      description: `${count} ${
+        count === 1 ? "saved item" : "saved items"
+      } in this area`,
+    }))
+    .sort((a, b) => b.count - a.count);
+}
+
+function buildResources(items: BrainItem[]): ResourceCategory[] {
+  const counts = new Map<string, number>();
+
+  for (const item of items) {
+    for (const resource of item.resources ?? []) {
+      const type = resource.type || "other";
+
+      counts.set(type, (counts.get(type) ?? 0) + 1);
+    }
+  }
+
+  const labels: Record<string, { label: string; icon: string }> = {
+    research_paper: {
+      label: "Research Papers",
+      icon: "📄",
+    },
+    book: {
+      label: "Books",
+      icon: "📚",
+    },
+    article: {
+      label: "Articles",
+      icon: "🔗",
+    },
+    video: {
+      label: "Videos",
+      icon: "🎥",
+    },
+    github: {
+      label: "GitHub",
+      icon: "💻",
+    },
+    course: {
+      label: "Courses",
+      icon: "🎓",
+    },
+    other: {
+      label: "Other",
+      icon: "📌",
+    },
+  };
+
+  return Array.from(counts.entries())
+    .map(([type, count]) => ({
+      label: labels[type]?.label ?? type,
+      icon: labels[type]?.icon ?? "📌",
+      count,
+    }))
+    .sort((a, b) => b.count - a.count);
+}
+
+/* ─────────────────────────────────────────────
+   Components
+───────────────────────────────────────────── */
+
+function NavItem({
+  href,
+  icon,
+  label,
+  active = false,
+}: {
+  href: string;
+  icon: string;
+  label: string;
+  active?: boolean;
+}) {
   return (
-    <div className="flex items-center gap-3 text-sm text-white/50">
-      <div className="h-2 w-2 rounded-full bg-white/40" />
-      {text}
+    <Link
+      href={href}
+      className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition ${
+        active
+          ? "bg-white/10 text-white"
+          : "text-white/40 hover:bg-white/5 hover:text-white"
+      }`}
+    >
+      <span>{icon}</span>
+      <span>{label}</span>
+    </Link>
+  );
+}
+
+function StatCard({
+  value,
+  label,
+  description,
+}: {
+  value: string;
+  label: string;
+  description: string;
+}) {
+  return (
+    <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
+      <p className="text-3xl font-semibold">{value}</p>
+
+      <p className="mt-2 text-sm font-medium text-white/75">
+        {label}
+      </p>
+
+      <p className="mt-1 text-xs text-white/35">
+        {description}
+      </p>
     </div>
   );
 }
 
-// ─────────────────────────────────────────────
-// RESOURCE CARD
-// ─────────────────────────────────────────────
-
-function Resource({ resource }: { resource: BrainResource }) {
-  const resourceType = resource.type.replaceAll("_", " ");
-
-  if (!resource.url) {
-    return (
-      <div className="flex items-center justify-between rounded-2xl border border-white/10 bg-black/10 p-4">
-        <div className="min-w-0">
-          <p className="text-xs capitalize text-white/35">
-            {resourceType}
-          </p>
-
-          <p className="mt-1 text-sm text-white/75">
-            {resource.title}
-          </p>
-        </div>
-
-        <span className="ml-4 shrink-0 text-xs text-white/25">
-          No link found
-        </span>
-      </div>
-    );
-  }
+function SavedItemCard({ item }: { item: BrainItem }) {
+  const concepts = item.key_concepts?.length ?? 0;
 
   return (
-    <a
-      href={resource.url}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="flex items-center justify-between rounded-2xl border border-white/10 bg-black/10 p-4 transition hover:border-white/20 hover:bg-white/5"
+    <Link
+      href={`/item/${item.id}`}
+      className="group rounded-2xl border border-white/10 bg-white/5 p-5 text-left transition hover:border-white/20 hover:bg-white/[0.07]"
     >
-      <div className="min-w-0">
-        <p className="text-xs capitalize text-white/35">
-          {resourceType}
-        </p>
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/10">
+          🧠
+        </div>
 
-        <p className="mt-1 truncate text-sm text-white/75">
-          {resource.title}
-        </p>
+        <span className="rounded-full bg-white/5 px-2.5 py-1 text-[11px] text-white/35">
+          Saved
+        </span>
       </div>
 
-      <span className="ml-4 shrink-0 text-white/30">
-        ↗
-      </span>
-    </a>
+      <h3 className="mt-5 font-medium text-white/90 group-hover:text-white">
+        {item.title}
+      </h3>
+
+      <p className="mt-2 text-xs text-white/40">
+        {item.topic}
+      </p>
+
+      <div className="mt-5 flex items-center justify-between border-t border-white/10 pt-4">
+        <span className="text-xs text-white/30">
+          {concepts} concepts
+        </span>
+
+        <span className="text-white/25 transition group-hover:text-white/60">
+          →
+        </span>
+      </div>
+    </Link>
+  );
+}
+
+function TopicCard({ topic }: { topic: Topic }) {
+  return (
+    <Link
+      href={`/topics?topic=${encodeURIComponent(topic.name)}`}
+      className="block rounded-2xl border border-white/10 bg-white/5 p-5 text-left transition hover:border-white/20 hover:bg-white/[0.07]"
+    >
+      <div className="flex items-center justify-between">
+        <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/10 text-sm">
+          ✦
+        </span>
+
+        <span className="text-xs text-white/30">
+          {topic.count} {topic.count === 1 ? "save" : "saves"}
+        </span>
+      </div>
+
+      <h3 className="mt-5 text-sm font-medium text-white/80">
+        {topic.name}
+      </h3>
+
+      <p className="mt-2 text-xs leading-5 text-white/35">
+        {topic.description}
+      </p>
+    </Link>
+  );
+}
+
+function ResourceCard({
+  resource,
+}: {
+  resource: ResourceCategory;
+}) {
+  return (
+    <Link
+      href={`/resources?type=${encodeURIComponent(resource.label)}`}
+      className="flex items-center gap-4 rounded-2xl border border-white/10 bg-white/5 p-5 text-left transition hover:border-white/20 hover:bg-white/[0.07]"
+    >
+      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white/10 text-lg">
+        {resource.icon}
+      </div>
+
+      <div>
+        <p className="text-sm font-medium text-white/75">
+          {resource.label}
+        </p>
+
+        <p className="mt-1 text-xs text-white/35">
+          {resource.count}{" "}
+          {resource.count === 1 ? "resource" : "resources"}
+        </p>
+      </div>
+    </Link>
+  );
+}
+
+function EmptyState({
+  title,
+  description,
+}: {
+  title: string;
+  description: string;
+}) {
+  return (
+    <div className="mt-5 rounded-2xl border border-white/10 bg-white/5 p-8 text-center">
+      <p className="font-medium text-white/70">{title}</p>
+
+      <p className="mt-2 text-sm text-white/35">{description}</p>
+    </div>
   );
 }

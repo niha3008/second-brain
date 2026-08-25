@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { createClient } from "@/lib/supabase/server";
 
 type BrainResource = {
   type: string;
@@ -18,18 +19,19 @@ type BrainItem = {
 };
 
 async function getBrainItems(): Promise<BrainItem[]> {
-  const response = await fetch(
-    `${process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"}/api/items`,
-    {
-      cache: "no-store",
-    }
-  );
+    const supabase = await createClient();
+    
+    const { data, error } = await supabase
+    .from("brain_items")
+    .select("*")
+    .order("created_at", { ascending: false });
 
-  if (!response.ok) {
-    throw new Error("Failed to fetch Brain items.");
+  if (error) {
+    console.error("Supabase dashboard fetch error:", error);
+    throw new Error(error.message);
   }
 
-  return response.json();
+  return (data ?? []) as BrainItem[];
 }
 
 export default async function DashboardPage() {

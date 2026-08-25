@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { supabase } from "@/lib/supabase/server";
+import { createClient } from "@/lib/supabase/server";
 
 type BrainResource = {
   type: string;
@@ -25,6 +25,16 @@ type PageProps = {
 };
 
 async function getBrainItem(id: string): Promise<BrainItem | null> {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return null;
+  }
+
   const { data, error } = await supabase
     .from("brain_items")
     .select("*")
@@ -91,7 +101,7 @@ export default async function SavedItemPage({ params }: PageProps) {
           </Link>
 
           <Link
-            href="/"
+            href="/add"
             className="rounded-full bg-white px-5 py-2.5 text-sm font-medium text-black transition hover:bg-white/90"
           >
             + Add to Brain
@@ -234,7 +244,7 @@ export default async function SavedItemPage({ params }: PageProps) {
             </Link>
 
             <Link
-              href="/"
+              href="/add"
               className="rounded-2xl bg-white px-5 py-3 text-center text-sm font-medium text-black transition hover:bg-white/90"
             >
               + Add another save
