@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { supabase } from "@/lib/supabase/server";
 
 type BrainResource = {
   type: string;
@@ -17,21 +18,6 @@ type BrainItem = {
   created_at: string;
 };
 
-async function getBrainItems(): Promise<BrainItem[]> {
-  const response = await fetch(
-    `${process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"}/api/items`,
-    {
-      cache: "no-store",
-    }
-  );
-
-  if (!response.ok) {
-    throw new Error("Failed to fetch Brain items.");
-  }
-
-  return response.json();
-}
-
 type Topic = {
   name: string;
   count: number;
@@ -39,9 +25,31 @@ type Topic = {
   resources: number;
 };
 
-export default async function TopicsPage() {
+type PageProps = {
+  searchParams: Promise<{
+    topic?: string;
+  }>;
+};
+
+async function getBrainItems(): Promise<BrainItem[]> {
+  const { data, error } = await supabase
+    .from("brain_items")
+    .select("*")
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    console.error("Supabase topics fetch error:", error);
+    throw new Error(error.message);
+  }
+
+  return (data ?? []) as BrainItem[];
+}
+
+export default async function TopicsPage({ searchParams }: PageProps) {
   let items: BrainItem[] = [];
   let error = false;
+
+  const { topic: selectedTopic } = await searchParams;
 
   try {
     items = await getBrainItems();
@@ -52,10 +60,26 @@ export default async function TopicsPage() {
 
   const topics = buildTopics(items);
 
+  const filteredItems = selectedTopic
+    ? items.filter(
+        (item) =>
+          item.topic.trim().toLowerCase() ===
+          selectedTopic.trim().toLowerCase()
+      )
+    : [];
+
   const totalConcepts = items.reduce(
     (total, item) => total + (item.key_concepts?.length ?? 0),
     0
   );
+
+  const selectedTopicData = selectedTopic
+    ? topics.find(
+        (topic) =>
+          topic.name.trim().toLowerCase() ===
+          selectedTopic.trim().toLowerCase()
+      )
+    : null;
 
   return (
     <main className="min-h-screen bg-[#120c0d] text-white">
@@ -75,11 +99,20 @@ export default async function TopicsPage() {
           <nav className="mt-10 space-y-2">
             <NavItem href="/dashboard" icon="🧠" label="Brain" />
 
-            <NavItem href="/topics" icon="📚" label="Topics" active />
+            <NavItem
+              href="/topics"
+              icon="📚"
+              label="Topics"
+              active
+            />
 
             <NavItem href="/dashboard" icon="🔖" label="Saves" />
 
-            <NavItem href="/resources" icon="📖" label="Resources" />
+            <NavItem
+              href="/resources"
+              icon="📖"
+              label="Resources"
+            />
           </nav>
 
           <div className="mt-auto">
@@ -163,6 +196,57 @@ export default async function TopicsPage() {
               />
             </section>
 
+            {/* Selected topic */}
+            {selectedTopic && selectedTopicData && (
+              <section className="mt-12">
+                <div className="flex items-end justify-between">
+                  <div>
+                    <p className="text-xs font-medium uppercase tracking-wider text-white/30">
+                      Selected topic
+                    </p>
+
+                    <h3 className="mt-2 text-2xl font-semibold">
+                      {selectedTopicData.name}
+                    </h3>
+
+                    <p className="mt-2 text-sm text-white/40">
+                      {selectedTopicData.count}{" "}
+                      {selectedTopicData.count === 1
+                        ? "saved item"
+                        : "saved items"}{" "}
+                      · {selectedTopicData.concepts} concepts ·{" "}
+                      {selectedTopicData.resources} resources
+                    </p>
+                  </div>
+
+                  <Link
+                    href="/topics"
+                    className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm text-white/50 transition hover:bg-white/10 hover:text-white"
+                  >
+                    View all topics
+                  </Link>
+                </div>
+
+                {filteredItems.length > 0 ? (
+                  <div className="mt-5 grid gap-4 sm:grid-cols-2">
+                    {filteredItems.map((item) => (
+                      <SavedItemCard key={item.id} item={item} />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="mt-5 rounded-3xl border border-white/10 bg-white/5 p-8 text-center">
+                    <p className="font-medium text-white/70">
+                      No saved items found
+                    </p>
+
+                    <p className="mt-2 text-sm text-white/35">
+                      This topic does not have any saved items yet.
+                    </p>
+                  </div>
+                )}
+              </section>
+            )}
+
             {/* Topics */}
             <section className="mt-12 pb-12">
               <div className="flex items-end justify-between">
@@ -188,6 +272,7 @@ export default async function TopicsPage() {
                     <TopicCard
                       key={topic.name}
                       topic={topic}
+                      selected={selectedTopic === topic.name}
                     />
                   ))}
                 </div>
@@ -258,11 +343,21 @@ function buildTopics(items: BrainItem[]): Topic[] {
     .sort((a, b) => b.count - a.count);
 }
 
-function TopicCard({ topic }: { topic: Topic }) {
+function TopicCard({
+  topic,
+  selected,
+}: {
+  topic: Topic;
+  selected: boolean;
+}) {
   return (
     <Link
       href={`/topics?topic=${encodeURIComponent(topic.name)}`}
-      className="group rounded-3xl border border-white/10 bg-white/5 p-6 transition hover:border-white/20 hover:bg-white/[0.07]"
+      className={`group rounded-3xl border p-6 transition ${
+        selected
+          ? "border-white/30 bg-white/10"
+          : "border-white/10 bg-white/5 hover:border-white/20 hover:bg-white/[0.07]"
+      }`}
     >
       <div className="flex items-start justify-between">
         <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-white/10 text-sm text-white/60">
@@ -297,6 +392,47 @@ function TopicCard({ topic }: { topic: Topic }) {
           value={topic.resources}
           label="Resources"
         />
+      </div>
+    </Link>
+  );
+}
+
+function SavedItemCard({ item }: { item: BrainItem }) {
+  return (
+    <Link
+      href={`/item/${item.id}`}
+      className="group rounded-2xl border border-white/10 bg-white/5 p-5 transition hover:border-white/20 hover:bg-white/[0.07]"
+    >
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/10">
+          🧠
+        </div>
+
+        <span className="rounded-full bg-white/5 px-2.5 py-1 text-[11px] text-white/35">
+          Saved
+        </span>
+      </div>
+
+      <h3 className="mt-5 font-medium text-white/90 group-hover:text-white">
+        {item.title}
+      </h3>
+
+      <p className="mt-2 text-xs text-white/40">
+        {item.topic}
+      </p>
+
+      <p className="mt-3 line-clamp-2 text-sm leading-6 text-white/35">
+        {item.summary}
+      </p>
+
+      <div className="mt-5 flex items-center justify-between border-t border-white/10 pt-4">
+        <span className="text-xs text-white/30">
+          {item.key_concepts?.length ?? 0} concepts
+        </span>
+
+        <span className="text-white/25 transition group-hover:text-white/60">
+          →
+        </span>
       </div>
     </Link>
   );
