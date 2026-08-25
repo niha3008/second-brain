@@ -1,130 +1,34 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import Sidebar from "@/components/layout/sidebar";
 
-type ResourceType =
-  | "Research Paper"
-  | "Book"
-  | "Article"
-  | "Video"
-  | "GitHub"
-  | "Course";
+type BrainResource = {
+  type: string;
+  title: string;
+  url: string;
+};
+
+type BrainItem = {
+  id: string;
+  title: string;
+  topic: string;
+  summary: string;
+  resources: BrainResource[];
+  created_at?: string;
+};
 
 type Resource = {
   id: string;
   title: string;
-  type: ResourceType;
+  type: string;
   topic: string;
   source: string;
   url: string;
-  description: string;
 };
 
-const resources: Resource[] = [
-  {
-    id: "attention-is-all-you-need",
-    title: "Attention Is All You Need",
-    type: "Research Paper",
-    topic: "AI & Machine Learning",
-    source: "Neural Networks",
-    url: "https://example.com/attention",
-    description:
-      "The foundational research paper introducing the Transformer architecture and self-attention.",
-  },
-  {
-    id: "deep-learning-goodfellow",
-    title: "Deep Learning",
-    type: "Book",
-    topic: "AI & Machine Learning",
-    source: "Neural Networks",
-    url: "https://example.com/deep-learning",
-    description:
-      "A comprehensive introduction to deep learning, neural networks and modern machine learning.",
-  },
-  {
-    id: "neural-networks-explained",
-    title: "Neural Networks Explained",
-    type: "Article",
-    topic: "AI & Machine Learning",
-    source: "Neural Networks",
-    url: "https://example.com/neural-networks",
-    description:
-      "A beginner-friendly explanation of how neural networks learn patterns from data.",
-  },
-  {
-    id: "backpropagation-guide",
-    title: "Backpropagation Explained",
-    type: "Video",
-    topic: "AI & Machine Learning",
-    source: "Neural Networks",
-    url: "https://example.com/backpropagation",
-    description:
-      "A visual walkthrough of backpropagation and how neural networks update their weights.",
-  },
-  {
-    id: "awesome-machine-learning",
-    title: "Awesome Machine Learning",
-    type: "GitHub",
-    topic: "AI & Machine Learning",
-    source: "Machine Learning Resources",
-    url: "https://github.com/",
-    description:
-      "A curated collection of machine learning frameworks, libraries, courses and resources.",
-  },
-  {
-    id: "react-documentation",
-    title: "React Documentation",
-    type: "Article",
-    topic: "Web Development",
-    source: "React Hooks",
-    url: "https://react.dev/",
-    description:
-      "Official documentation covering React fundamentals, hooks and modern React development.",
-  },
-  {
-    id: "designing-data-intensive",
-    title: "Designing Data-Intensive Applications",
-    type: "Book",
-    topic: "Computer Science",
-    source: "System Design Basics",
-    url: "https://example.com/data-intensive",
-    description:
-      "A guide to building reliable, scalable and maintainable data systems.",
-  },
-  {
-    id: "system-design-primer",
-    title: "System Design Primer",
-    type: "GitHub",
-    topic: "Computer Science",
-    source: "System Design Basics",
-    url: "https://github.com/",
-    description:
-      "A collection of system design concepts and interview preparation material.",
-  },
-  {
-    id: "fintech-landscape",
-    title: "Modern Fintech Landscape",
-    type: "Article",
-    topic: "Finance",
-    source: "Fintech Trends 2026",
-    url: "https://example.com/fintech",
-    description:
-      "An overview of emerging technologies and trends shaping financial services.",
-  },
-  {
-    id: "python-patterns",
-    title: "Python Design Patterns",
-    type: "Course",
-    topic: "Programming",
-    source: "Python Design Patterns",
-    url: "https://example.com/python",
-    description:
-      "A practical introduction to reusable software design patterns in Python.",
-  },
-];
-
-const filters: Array<"All" | ResourceType> = [
+const filters = [
   "All",
   "Research Paper",
   "Book",
@@ -135,101 +39,110 @@ const filters: Array<"All" | ResourceType> = [
 ];
 
 export default function ResourcesPage() {
-  const [activeFilter, setActiveFilter] =
-    useState<"All" | ResourceType>("All");
-
+  const [items, setItems] = useState<BrainItem[]>([]);
+  const [activeFilter, setActiveFilter] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function fetchItems() {
+      try {
+        setLoading(true);
+        setError(null);
+
+        const response = await fetch("/api/items");
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(
+            data.error || "Failed to load Brain items."
+          );
+        }
+
+        setItems(data);
+      } catch (error) {
+        console.error("Resources fetch error:", error);
+
+        setError(
+          error instanceof Error
+            ? error.message
+            : "Failed to load your resources."
+        );
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchItems();
+  }, []);
+
+  const resources = useMemo<Resource[]>(() => {
+    const result: Resource[] = [];
+
+    for (const item of items) {
+      for (const resource of item.resources ?? []) {
+        result.push({
+          id: `${item.id}-${resource.title}-${result.length}`,
+          title: resource.title,
+          type: formatResourceType(resource.type),
+          topic: item.topic,
+          source: item.title,
+          url: resource.url,
+        });
+      }
+    }
+
+    return result;
+  }, [items]);
 
   const filteredResources = useMemo(() => {
     const query = searchQuery.toLowerCase().trim();
 
     return resources.filter((resource) => {
       const matchesFilter =
-        activeFilter === "All" || resource.type === activeFilter;
+        activeFilter === "All" ||
+        resource.type === activeFilter;
 
       const matchesSearch =
         query.length === 0 ||
         resource.title.toLowerCase().includes(query) ||
         resource.topic.toLowerCase().includes(query) ||
-        resource.source.toLowerCase().includes(query) ||
-        resource.description.toLowerCase().includes(query);
+        resource.source.toLowerCase().includes(query);
 
       return matchesFilter && matchesSearch;
     });
-  }, [activeFilter, searchQuery]);
+  }, [activeFilter, searchQuery, resources]);
 
-  const resourceCount = filteredResources.length;
+  if (loading) {
+    return (
+      <main className="min-h-screen bg-[#120c0d] text-white">
+        <div className="flex min-h-screen">
+          <Sidebar active="resources" />
+
+          <div className="flex flex-1 items-center justify-center">
+            <div className="text-center">
+              <div className="mx-auto flex h-12 w-12 animate-pulse items-center justify-center rounded-2xl bg-white/10 text-xl">
+                🧠
+              </div>
+
+              <p className="mt-4 text-sm text-white/40">
+                Loading your resources...
+              </p>
+            </div>
+          </div>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="min-h-screen bg-[#120c0d] text-white">
       <div className="flex min-h-screen">
-        {/* Sidebar */}
-        <aside className="hidden w-64 shrink-0 border-r border-white/10 bg-black/10 px-5 py-6 lg:flex lg:flex-col">
-          <Link href="/" className="flex items-center gap-3 px-2">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/10 text-xl">
-              🧠
-            </div>
+        <Sidebar active="resources" />
 
-            <span className="text-lg font-semibold tracking-tight">
-              Second Brain
-            </span>
-          </Link>
-
-          <nav className="mt-10 space-y-2">
-            <SidebarLink
-              href="/dashboard"
-              icon="🏠"
-              label="Brain"
-            />
-
-            <SidebarLink
-              href="/dashboard"
-              icon="📚"
-              label="Topics"
-            />
-
-            <SidebarLink
-              href="/dashboard"
-              icon="🔖"
-              label="Saves"
-            />
-
-            <SidebarLink
-              href="/resources"
-              icon="📖"
-              label="Resources"
-              active
-            />
-          </nav>
-
-          <div className="mt-auto">
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-              <p className="text-sm font-medium">
-                Your Resource Library
-              </p>
-
-              <p className="mt-1 text-xs leading-5 text-white/40">
-                Resources discovered across everything you&apos;ve saved.
-              </p>
-
-              <div className="mt-4 grid grid-cols-2 gap-2">
-                <MiniStat
-                  value="12"
-                  label="Papers"
-                />
-
-                <MiniStat
-                  value="7"
-                  label="Books"
-                />
-              </div>
-            </div>
-          </div>
-        </aside>
-
-        {/* Main */}
         <div className="flex-1">
-          {/* Header */}
           <header className="flex items-center justify-between border-b border-white/10 px-6 py-5 sm:px-10">
             <div>
               <p className="text-sm text-white/35">
@@ -250,10 +163,13 @@ export default function ResourcesPage() {
           </header>
 
           <div className="mx-auto max-w-5xl px-6 py-10 sm:px-10">
-            {/* Hero */}
             <section>
               <p className="text-sm text-white/40">
-                {resources.length} resources discovered
+                {resources.length}{" "}
+                {resources.length === 1
+                  ? "resource"
+                  : "resources"}{" "}
+                discovered
               </p>
 
               <h2 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">
@@ -261,12 +177,17 @@ export default function ResourcesPage() {
               </h2>
 
               <p className="mt-3 max-w-2xl text-white/45">
-                Second Brain collects the useful papers, books, articles,
-                videos and other resources hidden inside the things you save.
+                Second Brain collects useful resources hidden inside the
+                things you save.
               </p>
             </section>
 
-            {/* Search */}
+            {error && (
+              <div className="mt-8 rounded-2xl border border-red-400/20 bg-red-400/10 px-5 py-4 text-sm text-red-200">
+                {error}
+              </div>
+            )}
+
             <section className="mt-10">
               <div className="relative">
                 <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-white/30">
@@ -285,7 +206,6 @@ export default function ResourcesPage() {
               </div>
             </section>
 
-            {/* Filters */}
             <section className="mt-5 overflow-x-auto">
               <div className="flex min-w-max gap-2">
                 {filters.map((filter) => {
@@ -309,7 +229,6 @@ export default function ResourcesPage() {
               </div>
             </section>
 
-            {/* Result count */}
             <div className="mt-10 flex items-center justify-between">
               <div>
                 <p className="text-xs font-medium uppercase tracking-wider text-white/30">
@@ -324,12 +243,13 @@ export default function ResourcesPage() {
               </div>
 
               <span className="rounded-full bg-white/5 px-3 py-1.5 text-xs text-white/35">
-                {resourceCount}{" "}
-                {resourceCount === 1 ? "resource" : "resources"}
+                {filteredResources.length}{" "}
+                {filteredResources.length === 1
+                  ? "resource"
+                  : "resources"}
               </span>
             </div>
 
-            {/* Resource list */}
             <section className="mt-5 space-y-3 pb-12">
               {filteredResources.length > 0 ? (
                 filteredResources.map((resource) => (
@@ -355,15 +275,62 @@ export default function ResourcesPage() {
   );
 }
 
-/* ─────────────────────────────────────────────
-   Resource row
-───────────────────────────────────────────── */
-
 function ResourceRow({
   resource,
 }: {
   resource: Resource;
 }) {
+  const hasUrl = resource.url.trim().length > 0;
+
+  const content = (
+    <div className="flex items-start gap-4">
+      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-white/10 text-xl">
+        {getResourceIcon(resource.type)}
+      </div>
+
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs text-white/35">
+            {resource.type}
+          </span>
+
+          <span className="text-white/15">•</span>
+
+          <span className="text-xs text-white/35">
+            {resource.topic}
+          </span>
+        </div>
+
+        <h4 className="mt-2 text-sm font-medium text-white/80 transition group-hover:text-white sm:text-base">
+          {resource.title}
+        </h4>
+
+        <div className="mt-4 flex flex-wrap items-center gap-2">
+          <span className="text-xs text-white/25">
+            Found in
+          </span>
+
+          <span className="rounded-full bg-white/5 px-2.5 py-1 text-xs text-white/45">
+            {resource.source}
+          </span>
+        </div>
+      </div>
+
+      <div className="hidden shrink-0 items-center gap-2 text-sm text-white/25 transition group-hover:text-white/70 sm:flex">
+        {hasUrl ? "Open" : "No link"}
+        {hasUrl && <span>↗</span>}
+      </div>
+    </div>
+  );
+
+  if (!hasUrl) {
+    return (
+      <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
+        {content}
+      </div>
+    );
+  }
+
   return (
     <a
       href={resource.url}
@@ -371,114 +338,60 @@ function ResourceRow({
       rel="noopener noreferrer"
       className="group block rounded-2xl border border-white/10 bg-white/5 p-5 transition hover:border-white/20 hover:bg-white/[0.07]"
     >
-      <div className="flex items-start gap-4">
-        {/* Icon */}
-        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-white/10 text-xl">
-          {getResourceIcon(resource.type)}
-        </div>
-
-        {/* Content */}
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-xs text-white/35">
-              {resource.type}
-            </span>
-
-            <span className="text-white/15">•</span>
-
-            <span className="text-xs text-white/35">
-              {resource.topic}
-            </span>
-          </div>
-
-          <h4 className="mt-2 text-sm font-medium text-white/80 transition group-hover:text-white sm:text-base">
-            {resource.title}
-          </h4>
-
-          <p className="mt-2 max-w-3xl text-xs leading-5 text-white/35 sm:text-sm">
-            {resource.description}
-          </p>
-
-          {/* Source */}
-          <div className="mt-4 flex flex-wrap items-center gap-2">
-            <span className="text-xs text-white/25">
-              Found in
-            </span>
-
-            <span className="rounded-full bg-white/5 px-2.5 py-1 text-xs text-white/45">
-              {resource.source}
-            </span>
-          </div>
-        </div>
-
-        {/* Open */}
-        <div className="hidden shrink-0 items-center gap-2 text-sm text-white/25 transition group-hover:text-white/70 sm:flex">
-          Open
-          <span>↗</span>
-        </div>
-      </div>
+      {content}
     </a>
   );
 }
 
-/* ─────────────────────────────────────────────
-   Sidebar
-───────────────────────────────────────────── */
+function formatResourceType(type: string) {
+  switch (type) {
+    case "research_paper":
+      return "Research Paper";
 
-function SidebarLink({
-  href,
-  icon,
-  label,
-  active = false,
-}: {
-  href: string;
-  icon: string;
-  label: string;
-  active?: boolean;
-}) {
-  return (
-    <Link
-      href={href}
-      className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition ${
-        active
-          ? "bg-white/10 text-white"
-          : "text-white/40 hover:bg-white/5 hover:text-white"
-      }`}
-    >
-      <span>{icon}</span>
+    case "github":
+      return "GitHub";
 
-      <span>{label}</span>
-    </Link>
-  );
+    case "course":
+      return "Course";
+
+    case "book":
+      return "Book";
+
+    case "article":
+      return "Article";
+
+    case "video":
+      return "Video";
+
+    default:
+      return "Other";
+  }
 }
 
-/* ─────────────────────────────────────────────
-   Mini stat
-───────────────────────────────────────────── */
+function getResourceIcon(type: string) {
+  switch (type) {
+    case "Research Paper":
+      return "📄";
 
-function MiniStat({
-  value,
-  label,
-}: {
-  value: string;
-  label: string;
-}) {
-  return (
-    <div className="rounded-xl bg-white/5 p-3">
-      <p className="text-lg font-semibold">
-        {value}
-      </p>
+    case "Book":
+      return "📚";
 
-      <p className="mt-1 text-[10px] text-white/30">
-        {label}
-      </p>
-    </div>
-  );
+    case "Article":
+      return "🔗";
+
+    case "Video":
+      return "🎥";
+
+    case "GitHub":
+      return "💻";
+
+    case "Course":
+      return "🎓";
+
+    default:
+      return "🔖";
+  }
 }
-
-/* ─────────────────────────────────────────────
-   Empty state
-───────────────────────────────────────────── */
 
 function EmptyState({
   searchQuery,
@@ -500,7 +413,7 @@ function EmptyState({
       <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-white/35">
         {searchQuery
           ? `Nothing matched "${searchQuery}". Try a different search term.`
-          : "There aren't any resources in this category yet."}
+          : "There aren't any resources in your saved content yet."}
       </p>
 
       <button
@@ -512,27 +425,4 @@ function EmptyState({
       </button>
     </div>
   );
-}
-
-/* ─────────────────────────────────────────────
-   Helpers
-───────────────────────────────────────────── */
-
-function getResourceIcon(type: ResourceType) {
-  switch (type) {
-    case "Research Paper":
-      return "📄";
-    case "Book":
-      return "📚";
-    case "Article":
-      return "🔗";
-    case "Video":
-      return "🎥";
-    case "GitHub":
-      return "💻";
-    case "Course":
-      return "🎓";
-    default:
-      return "🔖";
-  }
 }

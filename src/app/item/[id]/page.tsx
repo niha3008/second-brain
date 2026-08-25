@@ -1,5 +1,22 @@
 import Link from "next/link";
-import { mockBrainItem } from "@/lib/mock-data";
+import { supabase } from "@/lib/supabase/server";
+
+type BrainResource = {
+  type: string;
+  title: string;
+  url: string;
+};
+
+type BrainItem = {
+  id: string;
+  title: string;
+  topic: string;
+  summary: string;
+  key_concepts: string[];
+  resources: BrainResource[];
+  tags: string[];
+  created_at: string;
+};
 
 type PageProps = {
   params: Promise<{
@@ -7,12 +24,53 @@ type PageProps = {
   }>;
 };
 
+async function getBrainItem(id: string): Promise<BrainItem | null> {
+  const { data, error } = await supabase
+    .from("brain_items")
+    .select("*")
+    .eq("id", id)
+    .single();
+
+  if (error) {
+    console.error("Supabase item fetch error:", error);
+    return null;
+  }
+
+  return data as BrainItem;
+}
+
 export default async function SavedItemPage({ params }: PageProps) {
   const { id } = await params;
 
-  // For now, every mock item displays our Neural Networks example.
-  // Later, this ID will be used to fetch the real item from Supabase.
-  const item = mockBrainItem;
+  const item = await getBrainItem(id);
+
+  if (!item) {
+    return (
+      <main className="min-h-screen bg-[#120c0d] text-white">
+        <div className="mx-auto flex min-h-screen w-full max-w-5xl flex-col items-center justify-center px-6 text-center">
+          <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-white/10 text-2xl">
+            🧠
+          </div>
+
+          <h1 className="mt-6 text-2xl font-semibold">
+            Brain item not found
+          </h1>
+
+          <p className="mt-3 max-w-md text-sm leading-6 text-white/40">
+            We couldn&apos;t find the saved item you&apos;re looking for. It
+            may have been removed or the link may be invalid.
+          </p>
+
+          <Link
+            href="/dashboard"
+            className="mt-8 rounded-full bg-white px-5 py-2.5 text-sm font-medium text-black transition hover:bg-white/90"
+          >
+            Back to Brain
+          </Link>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="min-h-screen bg-[#120c0d] text-white">
@@ -46,389 +104,195 @@ export default async function SavedItemPage({ params }: PageProps) {
             href="/dashboard"
             className="text-sm text-white/35 transition hover:text-white/70"
           >
-            ← Back to your Brain
+            ← Back to Brain
           </Link>
         </div>
 
         {/* Main content */}
-        <section className="mt-12 grid gap-8 lg:grid-cols-[1fr_320px]">
-          {/* Main column */}
+        <section className="mx-auto mt-10 max-w-4xl">
+          {/* Header */}
           <div>
-            {/* Title */}
-            <div>
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-white/45">
-                  Saved screenshot
-                </span>
+            <p className="text-sm text-white/40">
+              Saved knowledge
+            </p>
 
-                <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-white/45">
-                  {item.topic}
-                </span>
+            <h1 className="mt-2 text-4xl font-semibold tracking-tight sm:text-5xl">
+              {item.title}
+            </h1>
+
+            <div className="mt-4 flex flex-wrap items-center gap-2">
+              <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-sm text-white/50">
+                {item.topic}
+              </span>
+
+              <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-sm text-white/35">
+                Saved {new Date(item.created_at).toLocaleDateString()}
+              </span>
+            </div>
+          </div>
+
+          {/* Summary */}
+          <section className="mt-10 rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur-xl sm:p-8">
+            <p className="text-xs font-medium uppercase tracking-wider text-white/35">
+              Summary
+            </p>
+
+            <p className="mt-5 text-base leading-8 text-white/70">
+              {item.summary}
+            </p>
+          </section>
+
+          {/* Key concepts */}
+          <section className="mt-5 rounded-3xl border border-white/10 bg-white/5 p-6 sm:p-8">
+            <p className="text-xs font-medium uppercase tracking-wider text-white/35">
+              Key concepts
+            </p>
+
+            {item.key_concepts?.length > 0 ? (
+              <div className="mt-5 flex flex-wrap gap-2">
+                {item.key_concepts.map((concept) => (
+                  <span
+                    key={concept}
+                    className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm text-white/65"
+                  >
+                    {concept}
+                  </span>
+                ))}
+              </div>
+            ) : (
+              <p className="mt-5 text-sm text-white/35">
+                No key concepts were identified.
+              </p>
+            )}
+          </section>
+
+          {/* Resources */}
+          <section className="mt-5 rounded-3xl border border-white/10 bg-white/5 p-6 sm:p-8">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs font-medium uppercase tracking-wider text-white/35">
+                  Resources
+                </p>
+
+                <p className="mt-2 text-sm text-white/35">
+                  Useful resources discovered from this save.
+                </p>
               </div>
 
-              <h1 className="mt-5 text-4xl font-semibold tracking-tight sm:text-5xl">
-                {item.title}
-              </h1>
-
-              <p className="mt-4 max-w-2xl text-base leading-7 text-white/45">
-                AI analyzed this save and turned it into structured knowledge.
-              </p>
+              <span className="rounded-full bg-white/10 px-3 py-1 text-xs text-white/40">
+                {item.resources?.length ?? 0} found
+              </span>
             </div>
 
-            {/* Summary */}
-            <section className="mt-10 rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur-xl sm:p-8">
-              <SectionLabel>Summary</SectionLabel>
-
-              <p className="mt-5 text-base leading-8 text-white/70">
-                {item.summary}
-              </p>
-            </section>
-
-            {/* Concepts */}
-            <section className="mt-5 rounded-3xl border border-white/10 bg-white/5 p-6 sm:p-8">
-              <SectionLabel>Key concepts</SectionLabel>
-
-              <p className="mt-2 text-sm text-white/35">
-                The main ideas identified in this save.
-              </p>
-
-              <div className="mt-6 grid gap-3 sm:grid-cols-2">
-                {item.key_concepts.map((concept, index) => (
-                  <div
-                    key={concept}
-                    className="flex items-center gap-4 rounded-2xl border border-white/10 bg-black/10 p-4"
-                  >
-                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/10 text-xs text-white/40">
-                      {index + 1}
-                    </span>
-
-                    <span className="text-sm text-white/70">
-                      {concept}
-                    </span>
-                  </div>
+            {item.resources?.length > 0 ? (
+              <div className="mt-5 space-y-3">
+                {item.resources.map((resource, index) => (
+                  <ResourceCard
+                    key={`${resource.title}-${index}`}
+                    resource={resource}
+                  />
                 ))}
               </div>
-            </section>
-
-            {/* Resources */}
-            <section className="mt-5 rounded-3xl border border-white/10 bg-white/5 p-6 sm:p-8">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <SectionLabel>Resources found</SectionLabel>
-
-                  <p className="mt-2 text-sm text-white/35">
-                    Useful resources discovered in or related to this save.
-                  </p>
-                </div>
-
-                <span className="rounded-full bg-white/10 px-3 py-1.5 text-xs text-white/40">
-                  {item.resources.length}
-                </span>
-              </div>
-
-              <div className="mt-6 space-y-3">
-                {item.resources.map((resource) => (
-                  <a
-                    key={resource.title}
-                    href={resource.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="group flex items-center justify-between gap-4 rounded-2xl border border-white/10 bg-black/10 p-4 transition hover:border-white/20 hover:bg-white/5"
-                  >
-                    <div className="flex min-w-0 items-center gap-4">
-                      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white/10 text-lg">
-                        {getResourceIcon(resource.type)}
-                      </div>
-
-                      <div className="min-w-0">
-                        <p className="text-xs capitalize text-white/35">
-                          {resource.type.replace("_", " ")}
-                        </p>
-
-                        <p className="mt-1 truncate text-sm text-white/75">
-                          {resource.title}
-                        </p>
-                      </div>
-                    </div>
-
-                    <span className="shrink-0 text-white/25 transition group-hover:text-white/70">
-                      ↗
-                    </span>
-                  </a>
-                ))}
-              </div>
-            </section>
-
-            {/* Connected knowledge */}
-            <section className="mt-5 rounded-3xl border border-white/10 bg-white/5 p-6 sm:p-8">
-              <SectionLabel>Connected knowledge</SectionLabel>
-
-              <p className="mt-2 max-w-xl text-sm leading-6 text-white/40">
-                Second Brain can eventually connect this save to other things
-                you&apos;ve saved about the same topic.
+            ) : (
+              <p className="mt-5 rounded-2xl border border-white/10 bg-black/10 p-4 text-sm text-white/35">
+                No resources were found in this save.
               </p>
+            )}
+          </section>
 
-              <div className="mt-6 grid gap-3 sm:grid-cols-2">
-                <RelatedItem
-                  title="Deep Learning Fundamentals"
-                  topic="AI & Machine Learning"
-                />
+          {/* Tags */}
+          <section className="mt-5 rounded-3xl border border-white/10 bg-white/5 p-6 sm:p-8">
+            <p className="text-xs font-medium uppercase tracking-wider text-white/35">
+              Tags
+            </p>
 
-                <RelatedItem
-                  title="Backpropagation Explained"
-                  topic="AI & Machine Learning"
-                />
-
-                <RelatedItem
-                  title="Transformers & Attention"
-                  topic="AI & Machine Learning"
-                />
-
-                <RelatedItem
-                  title="Machine Learning Roadmap"
-                  topic="AI & Machine Learning"
-                />
-              </div>
-            </section>
-
-            {/* Learn next */}
-            <section className="mt-5 rounded-3xl border border-white/10 bg-white/5 p-6 sm:p-8">
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/10">
-                  🎯
-                </div>
-
-                <div>
-                  <SectionLabel>What to learn next</SectionLabel>
-
-                  <p className="mt-1 text-sm text-white/35">
-                    A possible path based on this topic.
-                  </p>
-                </div>
-              </div>
-
-              <div className="mt-7 space-y-3">
-                <LearningStep
-                  number="01"
-                  title="Understand neurons"
-                  description="How individual artificial neurons process information."
-                  complete
-                />
-
-                <LearningStep
-                  number="02"
-                  title="Learn backpropagation"
-                  description="How neural networks learn from their mistakes."
-                  current
-                />
-
-                <LearningStep
-                  number="03"
-                  title="Explore optimization"
-                  description="How gradient descent improves model performance."
-                />
-
-                <LearningStep
-                  number="04"
-                  title="Explore CNNs & Transformers"
-                  description="How neural networks are adapted for different problems."
-                />
-              </div>
-            </section>
-
-            {/* Tags */}
-            <section className="mt-5 pb-12">
-              <SectionLabel>Tags</SectionLabel>
-
-              <div className="mt-4 flex flex-wrap gap-2">
+            {item.tags?.length > 0 ? (
+              <div className="mt-5 flex flex-wrap gap-2">
                 {item.tags.map((tag) => (
                   <span
                     key={tag}
-                    className="rounded-full border border-white/10 bg-white/5 px-3 py-2 text-sm text-white/45"
+                    className="rounded-full bg-white/10 px-3 py-2 text-sm text-white/55"
                   >
                     #{tag.replace(/\s+/g, "")}
                   </span>
                 ))}
               </div>
-            </section>
+            ) : (
+              <p className="mt-5 text-sm text-white/35">
+                No tags were generated.
+              </p>
+            )}
+          </section>
+
+          {/* Bottom navigation */}
+          <div className="mt-8 flex flex-col gap-3 pb-12 sm:flex-row sm:justify-between">
+            <Link
+              href="/dashboard"
+              className="rounded-2xl border border-white/10 bg-white/5 px-5 py-3 text-center text-sm text-white/55 transition hover:bg-white/10 hover:text-white"
+            >
+              ← Back to Brain
+            </Link>
+
+            <Link
+              href="/"
+              className="rounded-2xl bg-white px-5 py-3 text-center text-sm font-medium text-black transition hover:bg-white/90"
+            >
+              + Add another save
+            </Link>
           </div>
-
-          {/* Sidebar */}
-          <aside className="lg:sticky lg:top-8 lg:self-start">
-            <div className="rounded-3xl border border-white/10 bg-white/5 p-6">
-              <p className="text-xs font-medium uppercase tracking-wider text-white/35">
-                Knowledge snapshot
-              </p>
-
-              <div className="mt-6 space-y-5">
-                <Snapshot
-                  label="Topic"
-                  value={item.topic}
-                />
-
-                <Snapshot
-                  label="Concepts"
-                  value={`${item.key_concepts.length} identified`}
-                />
-
-                <Snapshot
-                  label="Resources"
-                  value={`${item.resources.length} found`}
-                />
-
-                <Snapshot
-                  label="Tags"
-                  value={`${item.tags.length} tags`}
-                />
-              </div>
-            </div>
-
-            <div className="mt-4 rounded-3xl border border-white/10 bg-white/5 p-6">
-              <p className="text-sm font-medium">
-                Ready to learn?
-              </p>
-
-              <p className="mt-2 text-xs leading-5 text-white/35">
-                Later, Second Brain can generate a short learning session
-                from this save and test you on what you learned.
-              </p>
-
-              <button
-                type="button"
-                className="mt-5 w-full rounded-2xl bg-white px-4 py-3 text-sm font-medium text-black transition hover:bg-white/90"
-              >
-                Start learning →
-              </button>
-            </div>
-          </aside>
         </section>
       </div>
     </main>
   );
 }
 
-/* ─────────────────────────────────────────────
-   Reusable components
-───────────────────────────────────────────── */
-
-function SectionLabel({
-  children,
+function ResourceCard({
+  resource,
 }: {
-  children: React.ReactNode;
+  resource: BrainResource;
 }) {
-  return (
-    <p className="text-xs font-medium uppercase tracking-wider text-white/40">
-      {children}
-    </p>
-  );
-}
+  const resourceType = resource.type.replaceAll("_", " ");
 
-function Snapshot({
-  label,
-  value,
-}: {
-  label: string;
-  value: string;
-}) {
-  return (
-    <div>
-      <p className="text-xs text-white/30">{label}</p>
+  if (!resource.url) {
+    return (
+      <div className="flex items-center justify-between rounded-2xl border border-white/10 bg-black/10 p-4">
+        <div className="min-w-0">
+          <p className="text-xs capitalize text-white/35">
+            {resourceType}
+          </p>
 
-      <p className="mt-1 text-sm leading-5 text-white/70">
-        {value}
-      </p>
-    </div>
-  );
-}
+          <p className="mt-1 text-sm text-white/75">
+            {resource.title}
+          </p>
+        </div>
 
-function RelatedItem({
-  title,
-  topic,
-}: {
-  title: string;
-  topic: string;
-}) {
-  return (
-    <button
-      type="button"
-      className="group rounded-2xl border border-white/10 bg-black/10 p-4 text-left transition hover:border-white/20 hover:bg-white/5"
-    >
-      <p className="text-sm text-white/70 transition group-hover:text-white">
-        {title}
-      </p>
-
-      <p className="mt-2 text-xs text-white/30">
-        {topic}
-      </p>
-    </button>
-  );
-}
-
-function LearningStep({
-  number,
-  title,
-  description,
-  complete = false,
-  current = false,
-}: {
-  number: string;
-  title: string;
-  description: string;
-  complete?: boolean;
-  current?: boolean;
-}) {
-  return (
-    <div
-      className={`flex gap-4 rounded-2xl border p-4 ${
-        current
-          ? "border-white/20 bg-white/10"
-          : "border-white/10 bg-black/10"
-      }`}
-    >
-      <div
-        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-xs ${
-          complete
-            ? "bg-white text-black"
-            : current
-              ? "bg-white/15 text-white"
-              : "bg-white/5 text-white/30"
-        }`}
-      >
-        {complete ? "✓" : number}
+        <span className="ml-4 shrink-0 text-xs text-white/25">
+          No link found
+        </span>
       </div>
-
-      <div>
-        <p
-          className={`text-sm font-medium ${
-            current ? "text-white" : "text-white/70"
-          }`}
-        >
-          {title}
-        </p>
-
-        <p className="mt-1 text-xs leading-5 text-white/35">
-          {description}
-        </p>
-      </div>
-    </div>
-  );
-}
-
-function getResourceIcon(type: string) {
-  switch (type) {
-    case "research_paper":
-      return "📄";
-    case "book":
-      return "📚";
-    case "article":
-      return "🔗";
-    case "video":
-      return "🎥";
-    case "github":
-      return "💻";
-    case "course":
-      return "🎓";
-    default:
-      return "🔖";
+    );
   }
+
+  return (
+    <a
+      href={resource.url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="flex items-center justify-between rounded-2xl border border-white/10 bg-black/10 p-4 transition hover:border-white/20 hover:bg-white/5"
+    >
+      <div className="min-w-0">
+        <p className="text-xs capitalize text-white/35">
+          {resourceType}
+        </p>
+
+        <p className="mt-1 truncate text-sm text-white/75">
+          {resource.title}
+        </p>
+      </div>
+
+      <span className="ml-4 shrink-0 text-white/30">
+        ↗
+      </span>
+    </a>
+  );
 }

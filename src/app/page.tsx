@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import Image from "next/image";
+import { useRef, useState } from "react";
 import type { BrainItem, BrainResource } from "@/types/brain";
 
 type Screen = "upload" | "processing" | "result";
@@ -11,27 +12,11 @@ export default function Home() {
   const [screen, setScreen] = useState<Screen>("upload");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-
   const [brainItem, setBrainItem] = useState<BrainItem | null>(null);
 
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
-
-  // Create image preview URL
-  useEffect(() => {
-    if (!selectedFile) {
-      setPreviewUrl(null);
-      return;
-    }
-
-    const url = URL.createObjectURL(selectedFile);
-    setPreviewUrl(url);
-
-    return () => {
-      URL.revokeObjectURL(url);
-    };
-  }, [selectedFile]);
 
   // ─────────────────────────────────────────────
   // FILE HANDLING
@@ -49,6 +34,21 @@ export default function Home() {
     setBrainItem(null);
     setSaveSuccess(false);
     setSelectedFile(file);
+
+    const reader = new FileReader();
+
+    reader.onload = () => {
+      if (typeof reader.result === "string") {
+        setPreviewUrl(reader.result);
+      }
+    };
+
+    reader.onerror = () => {
+      setError("Could not preview the selected image.");
+      setPreviewUrl(null);
+    };
+
+    reader.readAsDataURL(file);
   };
 
   // ─────────────────────────────────────────────
@@ -122,8 +122,6 @@ export default function Home() {
 
       setSaveSuccess(true);
 
-      // Give the user a moment to see the success state,
-      // then return to the upload screen.
       setTimeout(() => {
         setSelectedFile(null);
         setPreviewUrl(null);
@@ -247,7 +245,6 @@ export default function Home() {
           </header>
 
           <section className="mx-auto mt-16 max-w-3xl">
-            {/* Header */}
             <div className="mb-8">
               <p className="text-sm text-white/40">
                 AI analysis complete
@@ -262,21 +259,18 @@ export default function Home() {
               </p>
             </div>
 
-            {/* Error */}
             {error && (
               <div className="mb-5 rounded-2xl border border-red-400/20 bg-red-400/10 px-5 py-4 text-sm text-red-200">
                 {error}
               </div>
             )}
 
-            {/* Success */}
             {saveSuccess && (
               <div className="mb-5 rounded-2xl border border-green-400/20 bg-green-400/10 px-5 py-4 text-sm text-green-200">
                 ✓ Saved to your Brain!
               </div>
             )}
 
-            {/* Summary */}
             <section className="rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur-xl">
               <p className="text-xs font-medium uppercase tracking-wider text-white/40">
                 Summary
@@ -287,7 +281,6 @@ export default function Home() {
               </p>
             </section>
 
-            {/* Key Concepts */}
             <section className="mt-5 rounded-3xl border border-white/10 bg-white/5 p-6">
               <p className="text-xs font-medium uppercase tracking-wider text-white/40">
                 Key concepts
@@ -311,7 +304,6 @@ export default function Home() {
               )}
             </section>
 
-            {/* Resources */}
             <section className="mt-5 rounded-3xl border border-white/10 bg-white/5 p-6">
               <div className="flex items-center justify-between">
                 <div>
@@ -345,7 +337,6 @@ export default function Home() {
               </div>
             </section>
 
-            {/* Tags */}
             <section className="mt-5 rounded-3xl border border-white/10 bg-white/5 p-6">
               <p className="text-xs font-medium uppercase tracking-wider text-white/40">
                 Tags
@@ -369,7 +360,6 @@ export default function Home() {
               )}
             </section>
 
-            {/* Save */}
             <button
               type="button"
               onClick={handleSaveToBrain}
@@ -395,7 +385,6 @@ export default function Home() {
   return (
     <main className="min-h-screen bg-[#120c0d] text-white">
       <div className="mx-auto flex min-h-screen w-full max-w-5xl flex-col px-6 py-8 sm:px-10">
-        {/* Header */}
         <header className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/10 text-xl">
@@ -410,7 +399,6 @@ export default function Home() {
           </span>
         </header>
 
-        {/* Main */}
         <section className="flex flex-1 flex-col items-center justify-center py-16 text-center">
           <div className="mb-6 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm text-white/60">
             Save it once. Find it when it matters.
@@ -428,14 +416,12 @@ export default function Home() {
           </p>
 
           <div className="mt-12 w-full max-w-2xl">
-            {/* Error */}
             {error && (
               <div className="mb-5 rounded-2xl border border-red-400/20 bg-red-400/10 px-5 py-4 text-left text-sm text-red-200">
                 {error}
               </div>
             )}
 
-            {/* Upload area */}
             {!selectedFile ? (
               <button
                 type="button"
@@ -460,7 +446,6 @@ export default function Home() {
               </button>
             ) : (
               <div className="rounded-3xl border border-white/15 bg-white/6 p-5 text-left backdrop-blur-xl">
-                {/* Selected file info */}
                 <div className="flex items-center justify-between">
                   <div className="min-w-0">
                     <p className="truncate font-medium">
@@ -481,18 +466,19 @@ export default function Home() {
                   </button>
                 </div>
 
-                {/* Image preview */}
                 {previewUrl && (
                   <div className="mt-5 overflow-hidden rounded-2xl border border-white/10 bg-black/20">
-                    <img
+                    <Image
                       src={previewUrl}
                       alt="Selected screenshot preview"
+                      width={800}
+                      height={400}
+                      unoptimized
                       className="max-h-[400px] w-full object-contain"
                     />
                   </div>
                 )}
 
-                {/* Analyze */}
                 <button
                   type="button"
                   onClick={handleAddToBrain}
@@ -503,7 +489,6 @@ export default function Home() {
               </div>
             )}
 
-            {/* Hidden file input */}
             <input
               ref={fileInputRef}
               type="file"
@@ -515,7 +500,6 @@ export default function Home() {
             />
           </div>
 
-          {/* Other input options */}
           <div className="mt-6 flex flex-col gap-3 sm:flex-row">
             <button
               type="button"
@@ -533,7 +517,6 @@ export default function Home() {
           </div>
         </section>
 
-        {/* Footer */}
         <footer className="pb-4 text-center text-xs text-white/25">
           Your saved content becomes part of your personal knowledge graph.
         </footer>
@@ -562,7 +545,6 @@ function ProcessingStep({ text }: { text: string }) {
 function Resource({ resource }: { resource: BrainResource }) {
   const resourceType = resource.type.replaceAll("_", " ");
 
-  // Resource exists but Gemini couldn't find a URL.
   if (!resource.url) {
     return (
       <div className="flex items-center justify-between rounded-2xl border border-white/10 bg-black/10 p-4">
@@ -600,7 +582,9 @@ function Resource({ resource }: { resource: BrainResource }) {
         </p>
       </div>
 
-      <span className="ml-4 shrink-0 text-white/30">↗</span>
+      <span className="ml-4 shrink-0 text-white/30">
+        ↗
+      </span>
     </a>
   );
 }

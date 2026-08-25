@@ -1,12 +1,50 @@
 import type { BrainItem } from "@/types/brain";
 import { supabase } from "@/lib/supabase/server";
 
+export async function GET() {
+  try {
+    const { data, error } = await supabase
+      .from("brain_items")
+      .select("*")
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      console.error("Supabase fetch error:", error);
+
+      return Response.json(
+        {
+          error: error.message,
+        },
+        {
+          status: 500,
+        }
+      );
+    }
+
+    return Response.json(data ?? [], {
+      status: 200,
+    });
+  } catch (error) {
+    console.error("Get items error:", error);
+
+    return Response.json(
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : "Failed to fetch Brain items.",
+      },
+      {
+        status: 500,
+      }
+    );
+  }
+}
+
 export async function POST(request: Request) {
   try {
-    // Read the BrainItem sent by the frontend
     const body = (await request.json()) as BrainItem;
 
-    // Basic validation
     if (!body.title || !body.topic || !body.summary) {
       return Response.json(
         {
@@ -18,7 +56,6 @@ export async function POST(request: Request) {
       );
     }
 
-    // Save the BrainItem to Supabase
     const { data, error } = await supabase
       .from("brain_items")
       .insert({
@@ -32,7 +69,6 @@ export async function POST(request: Request) {
       .select()
       .single();
 
-    // Supabase returned an error
     if (error) {
       console.error("Supabase insert error:", error);
 
@@ -46,7 +82,6 @@ export async function POST(request: Request) {
       );
     }
 
-    // Successfully saved
     return Response.json(data, {
       status: 201,
     });

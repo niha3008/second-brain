@@ -1,106 +1,102 @@
-"use client";
-
 import Link from "next/link";
-import { useMemo, useState } from "react";
-import Sidebar from "@/components/layout/sidebar";
 
-type Topic = {
-  id: string;
-  name: string;
-  description: string;
-  saves: number;
-  concepts: number;
-  resources: number;
-  icon: string;
+type BrainResource = {
+  type: string;
+  title: string;
+  url: string;
 };
 
-const topics: Topic[] = [
-  {
-    id: "ai-machine-learning",
-    name: "AI & Machine Learning",
-    description:
-      "Neural networks, LLMs, transformers, deep learning and AI research.",
-    saves: 8,
-    concepts: 42,
-    resources: 12,
-    icon: "✦",
-  },
-  {
-    id: "web-development",
-    name: "Web Development",
-    description:
-      "React, Next.js, APIs, frontend architecture and modern web development.",
-    saves: 12,
-    concepts: 31,
-    resources: 8,
-    icon: "◈",
-  },
-  {
-    id: "computer-science",
-    name: "Computer Science",
-    description:
-      "Algorithms, databases, system design, operating systems and architecture.",
-    saves: 9,
-    concepts: 27,
-    resources: 15,
-    icon: "⌘",
-  },
-  {
-    id: "finance",
-    name: "Finance",
-    description:
-      "Fintech, financial markets, investing and financial technology.",
-    saves: 5,
-    concepts: 14,
-    resources: 7,
-    icon: "◫",
-  },
-  {
-    id: "programming",
-    name: "Programming",
-    description:
-      "Python, software engineering, design patterns and programming concepts.",
-    saves: 7,
-    concepts: 24,
-    resources: 9,
-    icon: "</>",
-  },
-  {
-    id: "productivity",
-    name: "Productivity",
-    description:
-      "Learning systems, workflows, note-taking and personal productivity.",
-    saves: 4,
-    concepts: 11,
-    resources: 6,
-    icon: "↗",
-  },
-];
+type BrainItem = {
+  id: string;
+  title: string;
+  topic: string;
+  summary: string;
+  key_concepts: string[];
+  resources: BrainResource[];
+  tags: string[];
+  created_at: string;
+};
 
-export default function TopicsPage() {
-  const [searchQuery, setSearchQuery] = useState("");
-
-  const filteredTopics = useMemo(() => {
-    const query = searchQuery.toLowerCase().trim();
-
-    if (!query) {
-      return topics;
+async function getBrainItems(): Promise<BrainItem[]> {
+  const response = await fetch(
+    `${process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"}/api/items`,
+    {
+      cache: "no-store",
     }
+  );
 
-    return topics.filter(
-      (topic) =>
-        topic.name.toLowerCase().includes(query) ||
-        topic.description.toLowerCase().includes(query)
-    );
-  }, [searchQuery]);
+  if (!response.ok) {
+    throw new Error("Failed to fetch Brain items.");
+  }
+
+  return response.json();
+}
+
+type Topic = {
+  name: string;
+  count: number;
+  concepts: number;
+  resources: number;
+};
+
+export default async function TopicsPage() {
+  let items: BrainItem[] = [];
+  let error = false;
+
+  try {
+    items = await getBrainItems();
+  } catch (err) {
+    console.error("Topics fetch error:", err);
+    error = true;
+  }
+
+  const topics = buildTopics(items);
+
+  const totalConcepts = items.reduce(
+    (total, item) => total + (item.key_concepts?.length ?? 0),
+    0
+  );
 
   return (
     <main className="min-h-screen bg-[#120c0d] text-white">
       <div className="flex min-h-screen">
-        <Sidebar active="topics" />
+        {/* Sidebar */}
+        <aside className="hidden w-64 shrink-0 border-r border-white/10 bg-black/10 px-5 py-6 lg:flex lg:flex-col">
+          <Link href="/" className="flex items-center gap-3 px-2">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/10 text-xl">
+              🧠
+            </div>
 
+            <span className="text-lg font-semibold tracking-tight">
+              Second Brain
+            </span>
+          </Link>
+
+          <nav className="mt-10 space-y-2">
+            <NavItem href="/dashboard" icon="🧠" label="Brain" />
+
+            <NavItem href="/topics" icon="📚" label="Topics" active />
+
+            <NavItem href="/dashboard" icon="🔖" label="Saves" />
+
+            <NavItem href="/resources" icon="📖" label="Resources" />
+          </nav>
+
+          <div className="mt-auto">
+            <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+              <p className="text-sm font-medium">Your Brain</p>
+
+              <p className="mt-1 text-xs leading-5 text-white/40">
+                {items.length}{" "}
+                {items.length === 1 ? "save has" : "saves have"} been turned
+                into organized knowledge.
+              </p>
+            </div>
+          </div>
+        </aside>
+
+        {/* Main */}
         <div className="flex-1">
-          {/* Header */}
           <header className="flex items-center justify-between border-b border-white/10 px-6 py-5 sm:px-10">
             <div>
               <p className="text-sm text-white/35">
@@ -124,7 +120,8 @@ export default function TopicsPage() {
             {/* Hero */}
             <section>
               <p className="text-sm text-white/40">
-                {topics.length} areas of knowledge
+                {topics.length}{" "}
+                {topics.length === 1 ? "area" : "areas"} of knowledge
               </p>
 
               <h2 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">
@@ -137,47 +134,36 @@ export default function TopicsPage() {
               </p>
             </section>
 
-            {/* Search */}
-            <section className="mt-10">
-              <div className="relative max-w-2xl">
-                <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-white/30">
-                  🔍
-                </span>
-
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(event) =>
-                    setSearchQuery(event.target.value)
-                  }
-                  placeholder="Search your topics..."
-                  className="w-full rounded-2xl border border-white/10 bg-white/5 py-4 pl-12 pr-5 text-sm text-white outline-none placeholder:text-white/25 transition focus:border-white/20 focus:bg-white/[0.07]"
-                />
+            {/* Error */}
+            {error && (
+              <div className="mt-8 rounded-2xl border border-red-400/20 bg-red-400/10 p-5 text-sm text-red-200">
+                We couldn&apos;t load your topics. Please refresh and try
+                again.
               </div>
-            </section>
+            )}
 
             {/* Stats */}
             <section className="mt-10 grid gap-4 sm:grid-cols-3">
               <StatCard
-                value="18"
+                value={String(topics.length)}
                 label="Topics"
                 description="Areas you've explored"
               />
 
               <StatCard
-                value="34"
+                value={String(items.length)}
                 label="Saves"
                 description="Across all topics"
               />
 
               <StatCard
-                value="149"
+                value={String(totalConcepts)}
                 label="Concepts"
                 description="Ideas you've discovered"
               />
             </section>
 
-            {/* Topic grid */}
+            {/* Topics */}
             <section className="mt-12 pb-12">
               <div className="flex items-end justify-between">
                 <div>
@@ -191,27 +177,42 @@ export default function TopicsPage() {
                 </div>
 
                 <span className="rounded-full bg-white/5 px-3 py-1.5 text-xs text-white/35">
-                  {filteredTopics.length}{" "}
-                  {filteredTopics.length === 1
-                    ? "topic"
-                    : "topics"}
+                  {topics.length}{" "}
+                  {topics.length === 1 ? "topic" : "topics"}
                 </span>
               </div>
 
-              {filteredTopics.length > 0 ? (
+              {topics.length > 0 ? (
                 <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                  {filteredTopics.map((topic) => (
+                  {topics.map((topic) => (
                     <TopicCard
-                      key={topic.id}
+                      key={topic.name}
                       topic={topic}
                     />
                   ))}
                 </div>
               ) : (
-                <EmptyState
-                  searchQuery={searchQuery}
-                  onClear={() => setSearchQuery("")}
-                />
+                <div className="mt-5 rounded-3xl border border-white/10 bg-white/5 px-6 py-16 text-center">
+                  <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-white/10">
+                    📚
+                  </div>
+
+                  <h3 className="mt-5 font-medium">
+                    No topics yet
+                  </h3>
+
+                  <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-white/35">
+                    Upload and save your first screenshot to start building
+                    your knowledge map.
+                  </p>
+
+                  <Link
+                    href="/"
+                    className="mt-5 inline-flex rounded-full bg-white px-4 py-2 text-sm font-medium text-black transition hover:bg-white/90"
+                  >
+                    Add your first save
+                  </Link>
+                </div>
               )}
             </section>
           </div>
@@ -221,19 +222,51 @@ export default function TopicsPage() {
   );
 }
 
-/* ─────────────────────────────────────────────
-   Topic Card
-───────────────────────────────────────────── */
+function buildTopics(items: BrainItem[]): Topic[] {
+  const topicMap = new Map<
+    string,
+    {
+      count: number;
+      concepts: number;
+      resources: number;
+    }
+  >();
+
+  for (const item of items) {
+    const topic = item.topic?.trim();
+
+    if (!topic) continue;
+
+    const existing = topicMap.get(topic);
+
+    topicMap.set(topic, {
+      count: (existing?.count ?? 0) + 1,
+      concepts:
+        (existing?.concepts ?? 0) +
+        (item.key_concepts?.length ?? 0),
+      resources:
+        (existing?.resources ?? 0) +
+        (item.resources?.length ?? 0),
+    });
+  }
+
+  return Array.from(topicMap.entries())
+    .map(([name, stats]) => ({
+      name,
+      ...stats,
+    }))
+    .sort((a, b) => b.count - a.count);
+}
 
 function TopicCard({ topic }: { topic: Topic }) {
   return (
     <Link
-      href={`/topics/${topic.id}`}
+      href={`/topics?topic=${encodeURIComponent(topic.name)}`}
       className="group rounded-3xl border border-white/10 bg-white/5 p-6 transition hover:border-white/20 hover:bg-white/[0.07]"
     >
       <div className="flex items-start justify-between">
         <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-white/10 text-sm text-white/60">
-          {topic.icon}
+          ✦
         </div>
 
         <span className="text-white/20 transition group-hover:text-white/60">
@@ -246,13 +279,13 @@ function TopicCard({ topic }: { topic: Topic }) {
       </h4>
 
       <p className="mt-2 text-sm leading-6 text-white/35">
-        {topic.description}
+        Knowledge saved under this topic.
       </p>
 
       <div className="mt-6 grid grid-cols-3 gap-2 border-t border-white/10 pt-5">
         <TopicStat
-          value={topic.saves}
-          label="Saves"
+          value={topic.count}
+          label={topic.count === 1 ? "Save" : "Saves"}
         />
 
         <TopicStat
@@ -268,10 +301,6 @@ function TopicCard({ topic }: { topic: Topic }) {
     </Link>
   );
 }
-
-/* ─────────────────────────────────────────────
-   Topic Stat
-───────────────────────────────────────────── */
 
 function TopicStat({
   value,
@@ -292,10 +321,6 @@ function TopicStat({
     </div>
   );
 }
-
-/* ─────────────────────────────────────────────
-   Stats
-───────────────────────────────────────────── */
 
 function StatCard({
   value,
@@ -323,38 +348,28 @@ function StatCard({
   );
 }
 
-/* ─────────────────────────────────────────────
-   Empty State
-───────────────────────────────────────────── */
-
-function EmptyState({
-  searchQuery,
-  onClear,
+function NavItem({
+  href,
+  icon,
+  label,
+  active = false,
 }: {
-  searchQuery: string;
-  onClear: () => void;
+  href: string;
+  icon: string;
+  label: string;
+  active?: boolean;
 }) {
   return (
-    <div className="mt-5 rounded-3xl border border-white/10 bg-white/5 px-6 py-16 text-center">
-      <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-white/10">
-        🔍
-      </div>
-
-      <h3 className="mt-5 font-medium">
-        No topics found
-      </h3>
-
-      <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-white/35">
-        Nothing matched &quot;{searchQuery}&quot;.
-      </p>
-
-      <button
-        type="button"
-        onClick={onClear}
-        className="mt-5 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm text-white/50 transition hover:bg-white/10 hover:text-white"
-      >
-        Clear search
-      </button>
-    </div>
+    <Link
+      href={href}
+      className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition ${
+        active
+          ? "bg-white/10 text-white"
+          : "text-white/40 hover:bg-white/5 hover:text-white"
+      }`}
+    >
+      <span>{icon}</span>
+      <span>{label}</span>
+    </Link>
   );
 }
