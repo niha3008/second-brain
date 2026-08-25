@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { supabase } from "@/lib/supabase/server";
 
 type BrainResource = {
   type: string;

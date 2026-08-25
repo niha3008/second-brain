@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { supabase } from "@/lib/supabase/server";
+import { createClient } from "@/lib/supabase/server";
 
 type BrainResource = {
   type: string;
@@ -25,6 +25,16 @@ type PageProps = {
 };
 
 async function getBrainItem(id: string): Promise<BrainItem | null> {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return null;
+  }
+
   const { data, error } = await supabase
     .from("brain_items")
     .select("*")
