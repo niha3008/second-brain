@@ -91,7 +91,7 @@ export default async function SavedItemPage({ params }: PageProps) {
           </Link>
 
           <Link
-            href="/"
+            href="/add"
             className="rounded-full bg-white px-5 py-2.5 text-sm font-medium text-black transition hover:bg-white/90"
           >
             + Add to Brain
@@ -234,7 +234,7 @@ export default async function SavedItemPage({ params }: PageProps) {
             </Link>
 
             <Link
-              href="/"
+              href="/add"
               className="rounded-2xl bg-white px-5 py-3 text-center text-sm font-medium text-black transition hover:bg-white/90"
             >
               + Add another save

@@ -142,7 +142,7 @@ export default async function TopicsPage({ searchParams }: PageProps) {
             </div>
 
             <Link
-              href="/"
+              href="/add"
               className="rounded-full bg-white px-5 py-2.5 text-sm font-medium text-black transition hover:bg-white/90"
             >
               + Add to Brain
@@ -292,7 +292,7 @@ export default async function TopicsPage({ searchParams }: PageProps) {
                   </p>
 
                   <Link
-                    href="/"
+                    href="/add"
                     className="mt-5 inline-flex rounded-full bg-white px-4 py-2 text-sm font-medium text-black transition hover:bg-white/90"
                   >
                     Add your first save
