@@ -113,7 +113,7 @@ export default async function DashboardPage() {
             </div>
 
             <Link
-              href="/"
+              href="/add"
               className="rounded-full bg-white px-5 py-2.5 text-sm font-medium text-black transition hover:bg-white/90"
             >
               + Add to Brain
